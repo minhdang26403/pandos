@@ -203,7 +203,7 @@ void main() {
 	addokbuf("insertProcQ, removeProcQ and emptyProcQ ok   \n");
 	addokbuf("process queues module ok      \n");
 
-	addokbuf("checking process trees...\n");
+  addokbuf("checking process trees...\n");
 
 	if (!emptyChild(procp[2]))
 	  adderrbuf("emptyChild: unexpected FALSE   ");
