@@ -9,8 +9,6 @@
 
 #include "../h/const.h"
 
-typedef unsigned char bool;
-
 typedef signed int cpu_t;
 
 
