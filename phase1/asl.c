@@ -51,6 +51,14 @@ HIDDEN semd_t* findPrevSemd(int *semAdd) {
   return semd_prev;
 }
 
+HIDDEN void tryFreeSemd(semd_t *semd_prev, semd_t *semd) {
+  if (emptyProcQ(semd->s_procQ)) {
+    /* remove the semaphore descriptor from the ASL if the queue is empty */
+    semd_prev->s_next = semd->s_next;
+    freeSemd(semd);
+  } 
+}
+
 int insertBlocked (int *semAdd, pcb_PTR p) {
   semd_t *semd_prev = findPrevSemd(semAdd);
   semd_t *semd = semd_prev->s_next;
@@ -87,12 +95,7 @@ pcb_PTR removeBlocked (int *semAdd) {
 
   pcb_PTR p = removeProcQ(&semd->s_procQ);
   p->p_semAdd = NULL;
-
-  if (emptyProcQ(semd->s_procQ)) {
-    /* remove the semaphore descriptor from the ASL if the queue is empty */
-    semd_prev->s_next = semd->s_next;
-    freeSemd(semd);
-  }
+  tryFreeSemd(semd_prev, semd);
 
   return p;
 }
@@ -107,15 +110,9 @@ pcb_PTR outBlocked (pcb_PTR p) {
   }
 
   pcb_PTR out_p = outProcQ(&semd->s_procQ, p);
-  /* TODO: should we remove the semaphore descriptor from the ASL if the
-    associated process queue is empty; either way works */
-  #if 0
-  if (emptyProcQ(semd->s_procQ)) {
-    semd_prev->s_next = semd->s_next;
-    freeSemd(semd);
-  }
-  #endif 
+  tryFreeSemd(semd_prev, semd);
 
+  /* out_p may be NULL if pcb pointed by p does not exist in the queue */
   return out_p;
 }
 
