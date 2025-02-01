@@ -102,23 +102,24 @@ typedef struct state_t {
 /* process control block type */
 typedef struct pcb_t {
   /* process queue fields */
-  struct pcb_t    *p_next,    /* pointer to next entry */
-                  *p_prev,    /* pointer to prev entry */
+  struct pcb_t    *p_next,      /* pointer to next entry    */
+                  *p_prev,      /* pointer to prev entry    */
 
   /* process tree fields */
-                  *p_prnt,    /* pointer to parent     */
-                  *p_child,   /* pointer to 1st child  */
-                  *p_sib;     /* pointer to sibling    */
+                  *p_prnt,      /* pointer to parent        */
+                  *p_child,     /* pointer to 1st child     */
+                  *p_next_sib,  /* pointer to next sibling  */
+                  *p_prev_sib;  /* pointer to prev sibling  */
   
   /* process status information */
-  state_t         p_s;        /* processor state */
-  cpu_t           p_time;     /* cpu time used by proc */
-  int             *p_semAdd;  /* pointer to sema4 on   */
-                              /* which process blocked */
+  state_t         p_s;          /* processor state          */
+  cpu_t           p_time;       /* cpu time used by proc    */
+  int             *p_semAdd;    /* pointer to sema4 on      */
+                                /* which process blocked    */
   
   /* support layer information */
   /* support_t       *p_supportStruct; */
-                              /* ptr to support struct */
+                                /* ptr to support struct */
 } pcb_t, *pcb_PTR;
 
 #endif

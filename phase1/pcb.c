@@ -11,7 +11,8 @@ HIDDEN void initPcb(pcb_PTR p) {
   p->p_prev = NULL;
   p->p_prnt = NULL;
   p->p_child = NULL;
-  p->p_sib = NULL;
+  p->p_next_sib = NULL;
+  p->p_prev_sib = NULL;
 
   p->p_s.s_entryHI = 0;
   p->p_s.s_cause = 0;
@@ -147,7 +148,12 @@ int emptyChild (pcb_PTR p) {
 }
 
 void insertChild (pcb_PTR prnt, pcb_PTR p) {
-  p->p_sib = prnt->p_child;
+  p->p_next_sib = prnt->p_child;
+  if (prnt->p_child != NULL) {
+    /* p is not the first child of this parent */
+    prnt->p_child->p_prev_sib = p;  
+  }
+  p->p_prev_sib = NULL;
   p->p_prnt = prnt;
   prnt->p_child = p;
 }
@@ -158,9 +164,7 @@ pcb_PTR removeChild (pcb_PTR p) {
     return NULL;
   }
 
-  pcb_PTR child = p->p_child;
-  p->p_child = child->p_sib;
-  return child;
+  return outChild(p->p_child);
 }
 
 pcb_PTR outChild (pcb_PTR p) {
@@ -172,16 +176,21 @@ pcb_PTR outChild (pcb_PTR p) {
 
   if (prnt->p_child == p) {
     /* p is the first child */
-    prnt->p_child = p->p_sib;
+    prnt->p_child = p->p_next_sib;
+    if (p->p_next_sib != NULL) {
+      /* p has a sibling */
+      p->p_next_sib->p_prev_sib = NULL;  
+    }
     return p;
   }
 
-  /* find the previous sibling of this child */
-  pcb_PTR prev_sib = prnt->p_child;
-  while (prev_sib->p_sib != p) {
-    prev_sib = prev_sib->p_sib;
+  /* get the prev sibling of p */
+  pcb_PTR prev_sib = p->p_prev_sib;
+  prev_sib->p_next_sib = p->p_next_sib;
+  if (p->p_next_sib != NULL) {
+    /* p is not the last child */
+    p->p_next_sib->p_prev_sib = prev_sib;  
   }
-  prev_sib->p_sib = p->p_sib;
 
   return p;
 }
