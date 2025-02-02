@@ -134,7 +134,7 @@ void initASL () {
 
   /* init the active semaphore list with two dummy semaphores */
   semdTable[0].s_next = &semdTable[1];
-  semdTable[0].s_semAdd = 0;
+  semdTable[0].s_semAdd = (int *)0;
   semdTable[0].s_procQ = mkEmptyProcQ();
   semdTable[1].s_next = NULL;
   semdTable[1].s_semAdd = (int *)MAXINT;
@@ -142,13 +142,9 @@ void initASL () {
   semd_h = semdTable;
 
   /* initialize the list of unused semaphores */
+  semdFree_h = NULL;
   int i;
-  for (i = 2; i < MAXPROC + 1; i++) {
-    initSemd(&semdTable[i]);
-    semdTable[i].s_next = &semdTable[i + 1];
+  for (i = 2; i < MAXPROC + 2; i++) {
+    freeSemd(&semdTable[i]);
   }
-  initSemd(&semdTable[MAXPROC + 1]);
-  
-  /* the first two semaphore descriptors were used as dummy descriptors */
-  semdFree_h = &semdTable[2];
 }
