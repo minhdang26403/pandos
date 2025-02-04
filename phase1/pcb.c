@@ -1,10 +1,28 @@
+/******************************* pcb.c *******************************************************************
+*
+* Process Control Block (PCB) Management
+* 
+* This module manages the allocation, deallocation, and organization of Process Control Blocks (PCBs).
+* It supports PCB queue management, tree-based parent-child relationships, and general PCB operations.
+* 
+* Free PCB list implemented as a singly linked list. Process queue implemented as a doubly linked list. Process
+* tree implemented as a tree of parent pointing to child, with this child and its siblings being connected
+* through a doubly linked list.
+* 
+* Written by Dang Truong, Loc Pham
+***********************************************************************************************************/
+
 #include "../h/const.h"
 #include "../h/pcb.h"
 #include "../h/types.h"
 
+/* Head of the free PCB list */
 HIDDEN pcb_t *pcbFree_h;
 
 
+/*
+ * Initialize a PCB by setting all fields to default values.
+ */
 HIDDEN void initPcb(pcb_PTR p) {
   /* TODO: update this function if new fields are added to pcb_t */
   p->p_next = NULL;
@@ -28,11 +46,19 @@ HIDDEN void initPcb(pcb_PTR p) {
   /* TODO: zero-init p->p_supportStruct */
 }
 
+/*
+ * Insert the element pointed to by p onto the pcbFree list.
+ */
 void freePcb (pcb_PTR p) {
   p->p_next = pcbFree_h;
   pcbFree_h = p;
 }
 
+/* 
+ * Return NULL if the pcbFree list is empty.
+ * Otherwise, remove an element from the pcbFree list, provide initial values for ALL of the pcbs fields (i.e. NULL and/or 0) and then return a pointer to the removed element.
+ * pcbs get reused, so it is important that no previous value persist in a pcb when it gets reallocated.
+*/
 pcb_PTR allocPcb () {
   if (pcbFree_h == NULL) {
     /* the pcbFree list is empty */
@@ -47,6 +73,10 @@ pcb_PTR allocPcb () {
   return p;
 }
 
+/*
+ * Initialize the pcbFree list to contain all the elements of the static array of MAXPROC pcbs.
+ * This method will be called only once during data structure initialization.
+ */
 void initPcbs () {
   /* allocate storage for pcbs as static storage */
   static pcb_t pcbFree[MAXPROC];
@@ -59,14 +89,25 @@ void initPcbs () {
   }
 }
 
+/*
+ * This method is used to initialize a variable to be tail pointer to a process queue.
+ * Return a pointer to the tail of an empty process queue; i.e. NULL.
+ */
 pcb_PTR mkEmptyProcQ () {
   return NULL;
 }
 
+/*
+ * Return TRUE if the queue whose tail is pointed to by tp is empty. Return FALSE otherwise.
+ */
 int emptyProcQ (pcb_PTR tp) {
   return tp == NULL;
 }
 
+/*
+ * Insert the pcb pointed to by p into the process queue whose tail pointer is pointed to by tp.
+ * Note the double indirection through tp to allow for the possible updating of the tail pointer as well.
+ */
 void insertProcQ (pcb_PTR *tp, pcb_PTR p) {
   if (emptyProcQ(*tp)) {
     p->p_next = p;
@@ -86,10 +127,20 @@ void insertProcQ (pcb_PTR *tp, pcb_PTR p) {
   *tp = p;
 }
 
+/*
+ * Remove the first (i.e. head) element from the process queue whose tail pointer is pointed to by tp.
+ * Return NULL if the process queue was initially empty; otherwise return the pointer to the removed element.
+ * Update the process queue’s tail pointer if necessary.
+ */
 pcb_PTR removeProcQ (pcb_PTR *tp) {
   return outProcQ(tp, headProcQ(*tp));
 }
 
+/*
+ * Remove the pcb pointed to by p from the process queue whose tail pointer is pointed to by tp.
+ * Update the process queue’s tail pointer if necessary. If the desired entry is not in the indicated queue (an error condition), return NULL; otherwise, return p.
+ * Note that p can point to any element of the process queue.
+ */
 pcb_PTR outProcQ (pcb_PTR *tp, pcb_PTR p) {
   if (emptyProcQ(*tp)) {
     return NULL;
@@ -125,6 +176,10 @@ pcb_PTR outProcQ (pcb_PTR *tp, pcb_PTR p) {
   return NULL;
 }
 
+/*
+ * Return a pointer to the first pcb from the process queue whose tail is pointed to by tp.
+ * Do not remove this pcbfrom the process queue. Return NULL if the process queue is empty.
+ */
 pcb_PTR headProcQ (pcb_PTR tp) {
   if (emptyProcQ(tp)) {
     return NULL;
@@ -132,10 +187,16 @@ pcb_PTR headProcQ (pcb_PTR tp) {
   return tp->p_next;
 }
 
+/*
+ * Return TRUE if the pcb pointed to by p has no children. Return FALSE otherwise.
+ */
 int emptyChild (pcb_PTR p) {
   return p->p_child == NULL;
 }
 
+/*
+ * Make the pcb pointed to by p a child of the pcb pointed to by prnt.
+ */
 void insertChild (pcb_PTR prnt, pcb_PTR p) {
   p->p_next_sib = prnt->p_child;
   if (prnt->p_child != NULL) {
@@ -147,6 +208,11 @@ void insertChild (pcb_PTR prnt, pcb_PTR p) {
   prnt->p_child = p;
 }
 
+/*
+ * Make the first child of the pcb pointed to by p no longer a child of p.
+ * Return NULL if initially there were no children of p.
+ * Otherwise, return a pointer to this removed first child pcb.
+ */
 pcb_PTR removeChild (pcb_PTR p) {
   if (p->p_child == NULL) {
     /* the pcb has no children */
@@ -156,6 +222,11 @@ pcb_PTR removeChild (pcb_PTR p) {
   return outChild(p->p_child);
 }
 
+/*
+ * Make the pcb pointed to by p no longer the child of its parent.
+ * If the pcb pointed to by p has no parent, return NULL; otherwise, return p.
+ * Note that the element pointed to by p need not be the first child of its parent.
+ */
 pcb_PTR outChild (pcb_PTR p) {
   pcb_PTR prnt = p->p_prnt;
   if (prnt == NULL) {
