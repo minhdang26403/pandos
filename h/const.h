@@ -43,6 +43,9 @@
 #define DEVREGLEN		  4		  /* device register field length in bytes, and regs per dev */	
 #define DEVREGSIZE	  16 		/* device register size in bytes */
 
+/* TODO: may need to change this */
+#define NUMDEVICES    6
+
 /* device register field number for non-terminal devices */
 #define STATUS			  0
 #define COMMAND			  1
