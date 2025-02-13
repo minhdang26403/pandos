@@ -99,6 +99,23 @@ typedef struct state_t {
 #define s_HI	s_reg[29]
 #define s_LO	s_reg[30]
 
+/* Status Register Bit Definitions */
+#define STATUS_IEC   (1U << 0)  /* Current Global Interrupt Enable */
+#define STATUS_KUC   (1U << 1)  /* Current Kernel/User Mode (0 = Kernel, 1 = User) */
+
+#define STATUS_IEP   (1U << 2)  /* Previous Interrupt Enable */
+#define STATUS_KUP   (1U << 3)  /* Previous Kernel/User Mode */
+
+#define STATUS_IEO   (1U << 4)  /* Old Interrupt Enable */
+#define STATUS_KUO   (1U << 5)  /* Old Kernel/User Mode */
+
+#define STATUS_IM(i) (1U << (8 + (i))) /* Interrupt Mask (bits 8-15) */
+
+#define STATUS_BEV   (1U << 22) /* Bootstrap Exception Vector */
+#define STATUS_TE    (1U << 27) /* Local Timer Enable */
+
+#define STATUS_CU0   (1U << 28) /* Coprocessor 0 Usability */
+
 /* process control block type */
 typedef struct pcb_t {
   /* process queue fields */
