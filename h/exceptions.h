@@ -10,4 +10,7 @@
 
 /***************************************************************/
 
+
+extern void generalExceptionHandler();
+
 #endif

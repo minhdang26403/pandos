@@ -1,4 +1,5 @@
 #include "../h/asl.h"
+#include "../h/exceptions.h"
 #include "../h/scheduler.h"
 #include "../h/initial.h"
 
@@ -20,10 +21,6 @@ pcb_PTR readyQueue; /* Tail pointer to a queue of pcbs that are in the "ready" s
 pcb_PTR currentProc; /* Pointer to the pcb that is in the "running" state */
 int deviceSem[NUMDEVICES + 1]; /* One additional semaphore to support the Pseudo-clock */
 
-
-void generalExceptionHandler() {
-
-}
 
 int main() {
   /* 2. Populate the Processor 0 Pass Up Vector */
