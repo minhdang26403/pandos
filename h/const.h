@@ -15,6 +15,24 @@
 /* maximum number of concurrent processes */
 #define MAXPROC       20
 
+/* Status Register Bit Definitions */
+#define ZERO_MASK    (0U)
+#define STATUS_IEC   (1U << 0)  /* Current Global Interrupt Enable */
+#define STATUS_KUC   (1U << 1)  /* Current Kernel/User Mode (0 = Kernel, 1 = User) */
+
+#define STATUS_IEP   (1U << 2)  /* Previous Interrupt Enable */
+#define STATUS_KUP   (1U << 3)  /* Previous Kernel/User Mode */
+
+#define STATUS_IEO   (1U << 4)  /* Old Interrupt Enable */
+#define STATUS_KUO   (1U << 5)  /* Old Kernel/User Mode */
+
+#define STATUS_IM(i) (1U << (8 + (i))) /* Interrupt Mask (bits 8-15) */
+
+#define STATUS_BEV   (1U << 22) /* Bootstrap Exception Vector */
+#define STATUS_TE    (1U << 27) /* Local Timer Enable */
+
+#define STATUS_CU0   (1U << 28) /* Coprocessor 0 Usability */
+
 /* timer, timescale, TOD-LO and other bus regs */
 #define RAMBASEADDR		0x10000000
 #define RAMBASESIZE		0x10000004
@@ -43,8 +61,13 @@
 #define DEVREGLEN		  4		  /* device register field length in bytes, and regs per dev */	
 #define DEVREGSIZE	  16 		/* device register size in bytes */
 
-/* TODO: may need to change this */
-#define NUMDEVICES    6
+/* uMPS3 supports five different classes of peripheral devices (disk, flash,
+ * (network card, printer and terminal) and up to eight instances of each type.
+ * Each terminal device consists of two independent sub-devices (one for receiving
+ * and one for transmitting), meaning we need to double the count for terminals:
+ *    NUMDEVICES = (4 x 8) + (8 x 2) = 48
+ */
+#define NUMDEVICES    48
 
 /* device register field number for non-terminal devices */
 #define STATUS			  0
@@ -75,6 +98,7 @@
 #define RAMSTART        0x20000000
 #define BIOSDATAPAGE    0x0FFFF000
 #define	PASSUPVECTOR	  0x0FFFF900
+#define STACKTOP        0x20001000  /* Nucleus stack size is one page (4KB) */
 
 /* Exceptions related constants */
 #define	PGFAULTEXCEPT	  0

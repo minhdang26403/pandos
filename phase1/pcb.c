@@ -27,13 +27,17 @@ HIDDEN pcb_t *pcbFree_h;
  */
 HIDDEN void initPcb(pcb_PTR p) {
   /* TODO: update this function if new fields are added to pcb_t */
+  /* process queue fields */
   p->p_next = NULL;
   p->p_prev = NULL;
+
+  /* process tree fields */
   p->p_prnt = NULL;
   p->p_child = NULL;
   p->p_next_sib = NULL;
   p->p_prev_sib = NULL;
 
+  /* process status information */
   p->p_s.s_entryHI = 0;
   p->p_s.s_cause = 0;
   p->p_s.s_status = 0;
@@ -42,10 +46,11 @@ HIDDEN void initPcb(pcb_PTR p) {
   for (i = 0; i < STATEREGNUM; i++) {
     p->p_s.s_reg[i] = 0;
   }
-
   p->p_time = 0;
   p->p_semAdd = NULL;
-  /* TODO: zero-init p->p_supportStruct */
+
+  /* support layer information */
+  p->p_supportStruct = NULL;
 }
 
 /*
