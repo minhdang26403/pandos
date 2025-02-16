@@ -8,19 +8,27 @@ void scheduler() {
     /* The Ready Queue is empty */
     
     if (procCnt == 0) {
+      /* Job well done */
       HALT();
     } else if (procCnt > 0 && softBlockCnt > 0) {
+      /* Enable global interrupts and disable the PLT */
+      unsigned int currentStatus = getSTATUS();
+      currentStatus |= STATUS_IEC;
+      currentStatus &= ~STATUS_TE;
+      setSTATUS(currentStatus);
+      /* Waiting for a device interrupt to occur */
       WAIT();
     } else if (procCnt > 0 && softBlockCnt == 0) {
+      /* TODO: take an appropriate deadlock detected action? */
+      /* Deadlock */
       PANIC();
     } else {
-      /* This case should never happen! */
+      /* Abnormal case should never happen! */
       PANIC();
     }
-
   }
+
   currentProc = p;
-  /* Load 5 milliseconds on the PLT */
-  setTIMER(5);
+  setTIMER(5000); /* Each process gets a time slice of 5 miliseconds */
   LDST(&p->p_s);
 }
