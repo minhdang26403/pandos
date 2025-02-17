@@ -33,6 +33,8 @@
 
 #define STATUS_CU0   (1U << 28) /* Coprocessor 0 Usability */
 
+#define CAUSE_EXCCODE(cause) (((cause) >> 2) & 0x1F)  /* Extract ExcCode (bits 2-6) */ 
+
 /* timer, timescale, TOD-LO and other bus regs */
 #define RAMBASEADDR		0x10000000
 #define RAMBASESIZE		0x10000004
