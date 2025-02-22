@@ -4,27 +4,42 @@
 #include "scheduler.h"
 #include "umps3/umps/libumps.h"
 
-int sysCreateProc() {
+HIDDEN void switchContext(state_t *state) {
+  /* LDST is a critical and dangerous instruction, so every call to context
+   * switch should be performed through this function */
+  LDST(state);
+}
+
+HIDDEN void waitOnSem(int *semaddr, state_t *savedExcState) {
+  currentProc->p_s = *savedExcState;
+  insertBlocked(semaddr, currentProc);
+  softBlockCnt++;
+  scheduler();
+}
+
+void sysCreateProc() {
+  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
   pcb_PTR p = allocPcb();
 
   if (p == NULL) {
     /* No more free pcb's */
-    return -1;
+    savedExcState->s_v0 = -1;
+  } else {
+    /* Successfully create a new process */
+    state_t *statep = (state_t *)savedExcState->s_a1;
+    support_t *supportp = (support_t *)savedExcState->s_a2;
+
+    p->p_s = *statep;
+    p->p_time = 0;
+    p->p_semAdd = NULL;
+    p->p_supportStruct = supportp;
+    insertProcQ(&readyQueue, p);
+    insertChild(currentProc, p);
+    procCnt++;
+    savedExcState->s_v0 = 0;
   }
 
-  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
-  state_t *statep = (state_t *)savedExcState->s_a1;
-  support_t *supportp = (support_t *)savedExcState->s_a2;
-
-  p->p_s = *statep;
-  p->p_time = 0;
-  p->p_semAdd = NULL;
-  p->p_supportStruct = supportp;
-  insertProcQ(&readyQueue, p);
-  insertChild(currentProc, p);
-  procCnt++;
-
-  return 0;
+  switchContext(savedExcState);
 }
 
 void terminateProcHelper(pcb_PTR p) {
@@ -33,117 +48,143 @@ void terminateProcHelper(pcb_PTR p) {
   }
 
   pcb_PTR child;
+  /* Recursively terminate all child processes first */
   while ((child = removeChild(p))) {
     terminateProcHelper(child);
   }
 
-  outProcQ(&readyQueue, p);
-  outBlocked(p);
+  if (p == currentProc) {
+    /* p is the current process */
+    currentProc = NULL;
+  } else {
+    /* p may be waiting on the ready queue or blocked on the ASL */
+    pcb_PTR removedProc = outProcQ(&readyQueue, p);
+    if (removedProc == NULL) {
+      /* p is blocked on the ASL since we can't find p on the ready queue */
+      outBlocked(p);
+      softBlockCnt--;
+    }
+  }
+
   freePcb(p);
   procCnt--;
 }
 
-int sysTerminateProc() {
+void sysTerminateProc() {
   terminateProcHelper(currentProc);
-  currentProc = NULL;
-  /* Call the scheduler to switch to another process without pushing the current
-   * process to the queue again */
+  /* Call the scheduler to find another process to run without pushing the
+   * currently running process to the queue again */
   scheduler();
-
-  return 0;
 }
 
-
 /* SYS3 – Passeren (P operation on a semaphore) */
-int sysPasseren() {
+void sysPasseren() {
   state_t *savedExcState = (state_t *)BIOSDATAPAGE;
   int *sem = (int *)savedExcState->s_a1;
+
+  if (sem == NULL) {
+    /* Caller passed in an valid semaphore address */
+    savedExcState->s_v0 = -1;
+    /* Return to the current process with an error code */
+    switchContext(savedExcState);
+  }
+
   (*sem)--;
   if (*sem < 0) {
-    /* TODO: "Update the accumulated CPU time for the Current Process" in section "3.5.11 Blocking SYSCALLs" in pandos.pdf ? */
-    currentProc->p_s = *savedExcState;
-    insertBlocked(sem, currentProc);
-    scheduler();
+    /* TODO: "Update the accumulated CPU time for the Current Process" in
+     * section "3.5.11 Blocking SYSCALLs" in pandos.pdf ? */
+    waitOnSem(sem, savedExcState);
   }
-  return 0;
+
+  /* TODO: should we support return value for P & V operations */
+  savedExcState->s_v0 = 0;
+  switchContext(savedExcState);
 }
 
 /* SYS4 – Verhogen (V operation on a semaphore) */
-int sysVerhogen() {
+void sysVerhogen() {
   state_t *savedExcState = (state_t *)BIOSDATAPAGE;
-  int *sem = (int *) savedExcState->s_a1;
+  int *sem = (int *)savedExcState->s_a1;
+
+  if (sem == NULL) {
+    /* Caller passed in an valid semaphore address */
+    savedExcState->s_v0 = -1;
+    /* Return to the current process with an error code */
+    switchContext(savedExcState);
+  }
+
   (*sem)++;
   if (*sem <= 0) {
     /* Unblock one process waiting on this semaphore, if any */
     pcb_PTR p = removeBlocked(sem);
     if (p != NULL) {
+      softBlockCnt--;
       insertProcQ(&readyQueue, p);
     }
   }
 
-  return 0;
+  savedExcState->s_v0 = 0;
+  switchContext(savedExcState);
 }
 
 /* SYS5 – Wait for IO Device (perform P on the appropriate device semaphore) */
-int sysWaitIO() {
+void sysWaitIO() {
   state_t *savedExcState = (state_t *)BIOSDATAPAGE;
-  /* Interrupt line number */
-  int line = savedExcState->s_a1;
-  /* Device number */
-  int devnum = savedExcState->s_a2;
-  /* TRUE if waiting for terminal read */
-  int waitForTermRead = savedExcState->s_a3;
+  int linenum = savedExcState->s_a1; /* Interrupt line number */
+  int devnum = savedExcState->s_a2;  /* Device number */
+  int waitForTermRead =
+      savedExcState->s_a3; /* TRUE if waiting for terminal read */
 
   int semIndex;
-  if (line != TERMINT) {
-    /* For non-terminal devices, index = (line - 3 being offset)*DEVPERINT + devnum */
-    semIndex = (line - 3) * DEVPERINT + devnum; 
+  if (linenum != TERMINT) {
+    /* The first three lines are for Inter-process interrupts, Processor Local
+     * Timer, Interval Timer */
+    semIndex = (linenum - 3) * DEVPERINT + devnum;
   } else {
-    /* For terminal devices, there are two semaphores per device. If waiting for a terminal read, use the receive semaphore; otherwise, the transmit semaphore. Terminals are indexed starting at 32 (since non-terminals take 32 entries) */
+    /* For terminal devices, there are two semaphores per device. If waiting for
+     * a terminal read, use the receive semaphore; otherwise, use the transmit
+     * semaphore. Terminals are indexed starting at 32 (since non-terminals take
+     * 4 * 8 = 32 entries) */
     semIndex = 32 + devnum * 2 + (waitForTermRead ? 0 : 1);
   }
-  int semaddr = &deviceSem[semIndex];
+
+  int *semaddr = &deviceSem[semIndex];
   (*semaddr)--;
-  if (*semaddr < 0) {
-    /* TODO: "Update the accumulated CPU time for the Current Process" in section "3.5.11 Blocking SYSCALLs" in pandos.pdf ? */
-    currentProc->p_s = *savedExcState;
-    insertBlocked(semaddr, currentProc);
-    scheduler();
-  }
-  return 0;
+
+  /* TODO: "Update the accumulated CPU time for the Current Process" in
+   * section "3.5.11 Blocking SYSCALLs" in pandos.pdf ? */
+  waitOnSem(semaddr, savedExcState); /* always block */
 }
 
-
-/* SYS6 – Get CPU Time (return the accumulated CPU time of the current process) */
-int sysGetCPUTime() {
+/* SYS6 – Get CPU Time (return the accumulated CPU time of the current process)
+ */
+void sysGetCPUTime() {
   state_t *savedExcState = (state_t *)BIOSDATAPAGE;
-  return currentProc->p_time;
+  savedExcState->s_v0 = currentProc->p_time;
+  switchContext(savedExcState);
 }
 
 /* SYS7 – Wait For Clock (perform P on the pseudo-clock semaphore) */
-int sysWaitForClock() {
+void sysWaitForClock() {
   state_t *savedExcState = (state_t *)BIOSDATAPAGE;
-  int *sem = &deviceSem[NUMDEVICES];  /* Pseudo–clock semaphore  */
+  int *sem = &deviceSem[NUMDEVICES]; /* Pseudo–clock semaphore  */
   (*sem)--;
-  if (*sem < 0) {
-    /* TODO: "Update the accumulated CPU time for the Current Process" in section "3.5.11 Blocking SYSCALLs" in pandos.pdf ? */
-    currentProc->p_s = *savedExcState;
-    softBlockCnt++;  /* Clock waits are soft–blocked */
-    insertBlocked(sem, currentProc);
-    scheduler();
-  }
-  return 0;
+
+  /* TODO: "Update the accumulated CPU time for the Current Process" in
+   * section "3.5.11 Blocking SYSCALLs" in pandos.pdf ? */
+  waitOnSem(sem, savedExcState); /* always block */
 }
 
-
-/* SYS8 – Get Support Data (return pointer to the current process's support structure) */
-int sysGetSupportData() {
+/* SYS8 – Get Support Data (return pointer to the current process's support
+ * structure) */
+void sysGetSupportData() {
   state_t *savedExcState = (state_t *)BIOSDATAPAGE;
-  return (int)currentProc->p_supportStruct;
+  savedExcState->s_v0 = (int)currentProc->p_supportStruct;
+  switchContext(savedExcState);
 }
 
 /* Define the function pointer type for syscalls */
-typedef int (*syscall_t)(void);
+typedef void (*syscall_t)(void);
 
 /* Declare the syscall table, mapping syscall numbers (1-8) to functions */
 static syscall_t syscalls[] = {
@@ -163,7 +204,7 @@ void syscallHandler() {
   int num = savedExcState->s_a0;
 
   if (num >= 1 && num <= 8) {
-    savedExcState->s_v0 = syscalls[num]();
+    syscalls[num]();
   } else {
     /* TODO:
      * - behavior for unknown system call?
@@ -188,13 +229,15 @@ void generalExceptionHandler() {
     /* TODO: Call Program Trap exception handler (section 3.7.2) */
   } else if (excCode == 8) {
     if (savedExcState->s_status & STATUS_KUP) {
-      savedExcState->s_pc += 4;
-      /* Currently, the OS only supports SYS1-SYS8, which are only available to
-       * processes executing in kernel-mode */
-      syscallHandler();
-    } else {
-      /* TODO: set Cause.ExcCode to RI here */
+      /* If previous mode was user mode (KUP = 1), handle program trap */
+      savedExcState->s_cause =
+          (savedExcState->s_cause & ~EXCCODE_MASK) | RI_EXCCODE;
       programTrapHandler();
+    } else {
+      /* If previous mode was kernel mode (KUP = 0), handle the syscall */
+      savedExcState->s_pc += 4; /* control of the current process should be
+                                   returned to the next instruction */
+      syscallHandler();
     }
   } else {
     /* Unknown exception code */

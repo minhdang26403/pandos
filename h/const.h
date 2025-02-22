@@ -33,6 +33,11 @@
 
 #define STATUS_CU0   (1U << 28) /* Coprocessor 0 Usability */
 
+/* Mask to clear the ExcCode field (bits 2-6) */
+#define EXCCODE_MASK 0x7C  /* 1111100 in binary, covers bits 2-6 */
+
+/* Value for RI (10) shifted into position */
+#define RI_EXCCODE   (10 << 2)  /* 10 shifted left by 2 = 40 */
 #define CAUSE_EXCCODE(cause) (((cause) >> 2) & 0x1F)  /* Extract ExcCode (bits 2-6) */ 
 
 /* timer, timescale, TOD-LO and other bus regs */
