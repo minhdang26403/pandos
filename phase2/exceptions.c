@@ -103,7 +103,8 @@ void generalExceptionHandler() {
   unsigned int excCode = CAUSE_EXCCODE(savedExcState->s_cause);
 
   if (excCode == 0) {
-    /* TODO: Call devide interrupt handler (section 3.6) */
+    /* Interrupt exception: call our interrupt handler (section 3.6) */
+    interruptHandler();
   } else if (excCode >= 1 && excCode <= 3) {
     /* TODO: Call TLB exception handler (section 3.7.3) */
   } else if ((excCode >= 4 && excCode <= 7) ||

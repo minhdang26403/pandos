@@ -34,6 +34,7 @@
 #define STATUS_CU0   (1U << 28) /* Coprocessor 0 Usability */
 
 #define CAUSE_EXCCODE(cause) (((cause) >> 2) & 0x1F)  /* Extract ExcCode (bits 2-6) */ 
+#define CAUSE_IP(cause) (((cause) >> 8) & 0xFF) /* Extract pending interrupt bits (bits 8-25) */
 
 /* timer, timescale, TOD-LO and other bus regs */
 #define RAMBASEADDR		0x10000000
@@ -101,6 +102,7 @@
 #define BIOSDATAPAGE    0x0FFFF000
 #define	PASSUPVECTOR	  0x0FFFF900
 #define STACKTOP        0x20001000  /* Nucleus stack size is one page (4KB) */
+#define DEVREG          0x10000054 /* All 40 device registers are located in low memory starting at 0x1000.0054 */
 
 /* Exceptions related constants */
 #define	PGFAULTEXCEPT	  0
