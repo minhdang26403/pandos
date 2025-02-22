@@ -53,19 +53,96 @@ int sysTerminateProc() {
   return 0;
 }
 
-int sysPasseren() {}
 
-int sysVerhogen() {}
+/* SYS3 – Passeren (P operation on a semaphore) */
+int sysPasseren() {
+  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+  int *sem = (int *)savedExcState->s_a1;
+  (*sem)--;
+  if (*sem < 0) {
+    /* TODO: "Update the accumulated CPU time for the Current Process" in section "3.5.11 Blocking SYSCALLs" in pandos.pdf ? */
+    currentProc->p_s = *savedExcState;
+    insertBlocked(sem, currentProc);
+    scheduler();
+  }
+  return 0;
+}
 
-int sysWaitIO() {}
+/* SYS4 – Verhogen (V operation on a semaphore) */
+int sysVerhogen() {
+  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+  int *sem = (int *) savedExcState->s_a1;
+  (*sem)++;
+  if (*sem <= 0) {
+    /* Unblock one process waiting on this semaphore, if any */
+    pcb_PTR p = removeBlocked(sem);
+    if (p != NULL) {
+      insertProcQ(&readyQueue, p);
+    }
+  }
 
-int sysGetCPUTime() {}
+  return 0;
+}
 
-int sysWaitForClock() {}
+/* SYS5 – Wait for IO Device (perform P on the appropriate device semaphore) */
+int sysWaitIO() {
+  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+  /* Interrupt line number */
+  int line = savedExcState->s_a1;
+  /* Device number */
+  int devnum = savedExcState->s_a2;
+  /* TRUE if waiting for terminal read */
+  int waitForTermRead = savedExcState->s_a3;
 
-int sysGetSupportData() {}
+  int semIndex;
+  if (line != TERMINT) {
+    /* For non-terminal devices, index = (line - 3 being offset)*DEVPERINT + devnum */
+    semIndex = (line - 3) * DEVPERINT + devnum; 
+  } else {
+    /* For terminal devices, there are two semaphores per device. If waiting for a terminal read, use the receive semaphore; otherwise, the transmit semaphore. Terminals are indexed starting at 32 (since non-terminals take 32 entries) */
+    semIndex = 32 + devnum * 2 + (waitForTermRead ? 0 : 1);
+  }
+  int semaddr = &deviceSem[semIndex];
+  (*semaddr)--;
+  if (*semaddr < 0) {
+    /* TODO: "Update the accumulated CPU time for the Current Process" in section "3.5.11 Blocking SYSCALLs" in pandos.pdf ? */
+    currentProc->p_s = *savedExcState;
+    insertBlocked(semaddr, currentProc);
+    scheduler();
+  }
+  return 0;
+}
 
-/*Define the function pointer type for syscalls */
+
+/* SYS6 – Get CPU Time (return the accumulated CPU time of the current process) */
+int sysGetCPUTime() {
+  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+  return currentProc->p_time;
+}
+
+/* SYS7 – Wait For Clock (perform P on the pseudo-clock semaphore) */
+int sysWaitForClock() {
+  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+  int *sem = &deviceSem[NUMDEVICES];  /* Pseudo–clock semaphore  */
+  (*sem)--;
+  if (*sem < 0) {
+    /* TODO: "Update the accumulated CPU time for the Current Process" in section "3.5.11 Blocking SYSCALLs" in pandos.pdf ? */
+    currentProc->p_s = *savedExcState;
+    softBlockCnt++;  /* Clock waits are soft–blocked */
+    insertBlocked(sem, currentProc);
+    scheduler();
+  }
+  return 0;
+}
+
+
+/* SYS8 – Get Support Data (return pointer to the current process's support structure) */
+int sysGetSupportData() {
+  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+  return (int)currentProc->p_supportStruct;
+}
+
+/* Define the function pointer type for syscalls */
 typedef int (*syscall_t)(void);
 
 /* Declare the syscall table, mapping syscall numbers (1-8) to functions */
