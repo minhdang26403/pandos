@@ -65,7 +65,12 @@ HIDDEN void sysTerminateProc(state_t *savedExcState) {
 }
 
 HIDDEN void waitOnSem(int *semaddr, state_t *savedExcState) {
+  /* Save the exception state */
   currentProc->p_s = *savedExcState;
+  /* Update the accumulated CPU time for the Current Process */
+  cpu_t now;
+  STCK(now);
+  currentProc->p_time += now - quantumStartTime;
   insertBlocked(semaddr, currentProc);
   softBlockCnt++;
   scheduler();
@@ -84,8 +89,6 @@ HIDDEN void sysPasseren(state_t *savedExcState) {
 
   (*sem)--;
   if (*sem < 0) {
-    /* TODO: "Update the accumulated CPU time for the Current Process" in
-     * section "3.5.11 Blocking SYSCALLs" in pandos.pdf ? */
     waitOnSem(sem, savedExcState);
   }
 
@@ -132,16 +135,16 @@ HIDDEN void sysWaitIO(state_t *savedExcState) {
   int semIndex = (lineNum - 3 + waitForTermRead) * DEVPERINT + devNum;
   int *semaddr = &deviceSem[semIndex];
   (*semaddr)--;
-
-  /* TODO: "Update the accumulated CPU time for the Current Process" in
-   * section "3.5.11 Blocking SYSCALLs" in pandos.pdf ? */
   waitOnSem(semaddr, savedExcState); /* always block */
 }
 
 /* SYS6 – Get CPU Time (return the accumulated CPU time of the current process)
  */
 HIDDEN void sysGetCPUTime(state_t *savedExcState) {
-  savedExcState->s_v0 = currentProc->p_time;
+  cpu_t now;
+  STCK(now);
+  cpu_t elapsed = now - quantumStartTime;
+  savedExcState->s_v0 = currentProc->p_time + elapsed;
   switchContext(savedExcState);
 }
 
@@ -149,9 +152,6 @@ HIDDEN void sysGetCPUTime(state_t *savedExcState) {
 HIDDEN void sysWaitForClock(state_t *savedExcState) {
   int *sem = &deviceSem[NUMDEVICES]; /* Pseudo–clock semaphore  */
   (*sem)--;
-
-  /* TODO: "Update the accumulated CPU time for the Current Process" in
-   * section "3.5.11 Blocking SYSCALLs" in pandos.pdf ? */
   waitOnSem(sem, savedExcState); /* always block */
 }
 

@@ -90,11 +90,14 @@
 #define TRANCOMMAND 	3
 
 /* device common STATUS codes */
-#define UNINSTALLED		0
-#define READY			    1
-#define BUSY			    3
-#define CHAR_RECV     5
-#define CHAR_TRANSM   5
+#define UNINSTALLED		    0
+#define READY			        1
+#define BUSY			        3
+#define CHAR_RECEIVED     5   /* Terminal receive completion */
+#define CHAR_TRANSMITTED  5   /* Terminal transmit completion */
+/* For terminal devices, their status code is stored in the first byte 
+ * of the 32-bit TRANSM_STATUS/RECV_STATUS field */
+#define TERMINT_STATUS_MASK 0xFF
 
 /* device common COMMAND codes */
 #define RESET			    0

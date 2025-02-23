@@ -1,6 +1,9 @@
 #include "../h/initial.h"
 #include "umps3/umps/libumps.h"
 
+/* Global variable to track when the current process's quantum started */
+cpu_t quantumStartTime = 0;
+
 void switchContext(state_t *state) {
   /* LDST is a critical and dangerous instruction, so every call to context
    * switch should be performed through this function */
@@ -30,17 +33,15 @@ void scheduler() {
       setSTATUS(currentStatus);
       /* Waiting for a device interrupt to occur */
       WAIT();
-    } else if (procCnt > 0 && softBlockCnt == 0) {
-      /* TODO: take an appropriate deadlock detected action? */
-      /* Deadlock */
-      PANIC();
     } else {
-      /* Abnormal case should never happen! */
+      /* Deadlock or abnormal case */
       PANIC();
     }
   }
 
+  /* Set new current process and start its quantum */
   currentProc = p;
-  setTIMER(QUANTUM); /* Each process gets a time slice of 5 miliseconds */
+  STCK(quantumStartTime);
+  setTIMER(QUANTUM); /* Each process gets a time slice of 5ms */
   switchContext(&p->p_s);
 }

@@ -10,10 +10,10 @@
 
 /***************************************************************/
 
+extern cpu_t quantumStartTime;
+
 extern void switchContext(state_t *);
-
 extern void loadContext(context_t *);
-
 extern void scheduler();
 
 #endif

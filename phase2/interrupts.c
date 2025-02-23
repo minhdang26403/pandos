@@ -3,49 +3,53 @@
 #include "scheduler.h"
 #include "types.h"
 
+HIDDEN void VSemaphore(int *semaddr, unsigned int statusCode) {
+  (*semaddr)++; /* V operation */
+  pcb_PTR p = removeBlocked(semaddr);
+  if (p != NULL) {
+    p->p_s.s_v0 = statusCode; /* Return status to process */
+    softBlockCnt--;
+    insertProcQ(&readyQueue, p);
+  }
+}
+
 HIDDEN void handleDeviceInterrupt(state_t *savedExcState, int lineNum,
                                   int devNum) {
   /* Get the device's device register */
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *devreg = &busRegArea->devreg[(lineNum - 3) * DEVPERINT + devNum];
 
-  /* Save off the status code from the device's device register */
-  unsigned int statusCode;
-  int termRecvReady = 0;
-
   if (lineNum == TERMINT) {
-    if (devreg->t_transm_status != BUSY) {
-      /* Prioritize terminal transmission */
-      statusCode = devreg->t_transm_status;
-    } else if (devreg->t_recv_status != BUSY) {
-      /* If terminal transmission is busy, then terminal receipt must not be
-       * busy */
-      statusCode = devreg->t_recv_status;
-      termRecvReady = 1;
-    } else {
-      PANIC();
+    /* Check both sub-devices, prioritize transmit */
+    int handled = 0;
+
+    /* Transmitter (write) - higher priority */
+    unsigned int transmStatus = devreg->t_transm_status & TERMINT_STATUS_MASK;
+    if (transmStatus == CHAR_TRANSMITTED) {
+      int semIndex = (lineNum - 3) * DEVPERINT + devNum; /* 32-39 */
+      devreg->t_transm_command = ACK;                    /* Ack transmit */
+      VSemaphore(&deviceSem[semIndex], transmStatus);
+      handled = 1;
+    }
+
+    /* Receiver (read) */
+    unsigned int recvStatus = devreg->t_recv_status & TERMINT_STATUS_MASK;
+    if (recvStatus == CHAR_RECEIVED) {
+      int semIndex = (lineNum - 3 + 1) * DEVPERINT + devNum; /* 40-47 */
+      devreg->t_recv_command = ACK;                          /* Ack receive */
+      VSemaphore(&deviceSem[semIndex], recvStatus);
+      handled = 1;
+    }
+
+    if (!handled) {
+      PANIC(); /* No sub-device completed? */
     }
   } else {
-    statusCode = devreg->d_status;
-  }
-
-  /* Acknowledge the outstanding interrupt */
-  devreg->d_command = ACK;
-
-  /* The first three lines are for Inter-process interrupts, Processor Local
-   * Timer, Interval Timer. We have two sets of semaphores (each set with 8
-   * semaphores) for terminal transmission and terminal receipt. */
-  int semIndex = (lineNum - 3 + termRecvReady) * DEVPERINT + devNum;
-
-  /* Perform a V operation on the Nucleus maintained semaphore associated with
-   * this (sub)device */
-  int *semaddr = &deviceSem[semIndex];
-  (*semaddr)++;
-  pcb_PTR p = removeBlocked(semaddr);
-  if (p != NULL) {
-    p->p_s.s_v0 = statusCode;
-    softBlockCnt--;
-    insertProcQ(&readyQueue, p);
+    /* Non-terminal devices */
+    unsigned int statusCode = devreg->d_status;
+    devreg->d_command = ACK;
+    int semIndex = (lineNum - 3) * DEVPERINT + devNum;
+    VSemaphore(&deviceSem[semIndex], statusCode);
   }
 
   switchContext(savedExcState);
@@ -58,8 +62,10 @@ HIDDEN void handlePLT(state_t *savedExcState) {
   /* Copy the saved exception state into the current process's pcb */
   currentProc->p_s = *savedExcState;
 
-  /* Update the accumulated CPU time (we have a 5ms slice) */
-  currentProc->p_time += QUANTUM;
+  /* Update the accumulated CPU time */
+  cpu_t now;
+  STCK(now);
+  currentProc->p_time += now - quantumStartTime;
 
   /* Enqueue the current process back into the ready queue */
   insertProcQ(&readyQueue, currentProc);
