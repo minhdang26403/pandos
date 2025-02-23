@@ -33,8 +33,8 @@ HIDDEN void terminateProcHelper(pcb_PTR p) {
     return;
   }
 
-  pcb_PTR child;
   /* Recursively terminate all child processes first */
+  pcb_PTR child;
   while ((child = removeChild(p))) {
     terminateProcHelper(child);
   }
@@ -47,9 +47,18 @@ HIDDEN void terminateProcHelper(pcb_PTR p) {
     /* p may be waiting on the ready queue or blocked on the ASL */
     pcb_PTR removedProc = outProcQ(&readyQueue, p);
     if (removedProc == NULL) {
-      /* p is blocked on the ASL since we can't find p on the ready queue */
-      outBlocked(p);
-      softBlockCnt--;
+      /* Not on ready queue, must be blocked */
+      if (outBlocked(p) == NULL) {
+        /* Process not found anywhere */
+        PANIC();
+      }
+      int *semaddr = p->p_semAdd;
+      if (semaddr != NULL &&
+          (semaddr < deviceSem || semaddr >= deviceSem + NUMDEVICES)) {
+        /* Adjust non-device semaphore */
+        (*semaddr)++;
+      }
+      softBlockCnt--; /* Any blocked process reduces soft block count */
     }
   }
 

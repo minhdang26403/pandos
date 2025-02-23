@@ -256,6 +256,7 @@ pcb_PTR outChild (pcb_PTR p) {
     return NULL;
   }
 
+  p->p_prnt = NULL;
   if (prnt->p_child == p) {
     /* p is the first child */
     prnt->p_child = p->p_next_sib;
