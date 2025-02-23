@@ -144,8 +144,10 @@ void sysWaitIO() {
     /* For terminal devices, there are two semaphores per device. If waiting for
      * a terminal read, use the receive semaphore; otherwise, use the transmit
      * semaphore. Terminals are indexed starting at 32 (since non-terminals take
-     * 4 * 8 = 32 entries) */
-    semIndex = 32 + devnum * 2 + (waitForTermRead ? 0 : 1);
+     * 4 * 8 = 32 entries)
+     * Note: terminal transmission is of higher priority than terminal receipt
+     */
+    semIndex = 32 + devnum * 2 + (waitForTermRead ? 1 : 0);
   }
 
   int *semaddr = &deviceSem[semIndex];
