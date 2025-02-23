@@ -1,12 +1,17 @@
 #include "../h/initial.h"
 #include "umps3/umps/libumps.h"
 
+void switchContext(state_t *state) {
+  /* LDST is a critical and dangerous instruction, so every call to context
+   * switch should be performed through this function */
+  LDST(state);
+}
 
 void scheduler() {
   pcb_PTR p = removeProcQ(&readyQueue);
   if (p == NULL) {
     /* The Ready Queue is empty */
-    
+
     if (procCnt == 0) {
       /* Job well done */
       HALT();
@@ -29,6 +34,6 @@ void scheduler() {
   }
 
   currentProc = p;
-  setTIMER(5000); /* Each process gets a time slice of 5 miliseconds */
-  LDST(&p->p_s);
+  setTIMER(QUANTUM); /* Each process gets a time slice of 5 miliseconds */
+  switchContext(&p->p_s);
 }

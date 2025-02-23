@@ -11,4 +11,8 @@
 
 /***************************************************************/
 
+#include "types.h"
+
+extern void interruptHandler(state_t*);
+
 #endif
