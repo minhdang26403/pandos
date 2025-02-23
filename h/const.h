@@ -36,8 +36,8 @@
 /* Mask to clear the ExcCode field (bits 2-6) */
 #define EXCCODE_MASK 0x7C  /* 1111100 in binary, covers bits 2-6 */
 
-/* Value for RI (10) shifted into position */
-#define RI_EXCCODE   (10 << 2)  /* 10 shifted left by 2 = 40 */
+
+#define RI_EXCCODE   (10 << 2)  /* Value for RI (10) shifted into position */
 #define CAUSE_EXCCODE(cause) (((cause) >> 2) & 0x1F)  /* Extract ExcCode (bits 2-6) */ 
 #define CAUSE_IP(cause) ((cause) & 0xFF00) /* Extract pending interrupt bits (bits 8-15) */
 
@@ -93,6 +93,8 @@
 #define UNINSTALLED		0
 #define READY			    1
 #define BUSY			    3
+#define CHAR_RECV     5
+#define CHAR_TRANSM   5
 
 /* device common COMMAND codes */
 #define RESET			    0

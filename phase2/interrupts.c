@@ -9,31 +9,33 @@ HIDDEN void handleDeviceInterrupt(state_t *savedExcState, int lineNum,
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *devreg = &busRegArea->devreg[(lineNum - 3) * DEVPERINT + devNum];
 
-  /* Acknowledge the outstanding interrupt */
-  devreg->d_command = ACK;
-
   /* Save off the status code from the device's device register */
   unsigned int statusCode;
-  int waitForTermRead = 0;
+  int termRecvReady = 0;
 
-  if (lineNum != TERMINT) {
-    statusCode = devreg->d_status;
-  } else {
-    if (devreg->t_transm_status == READY) {
+  if (lineNum == TERMINT) {
+    if (devreg->t_transm_status != BUSY) {
       /* Prioritize terminal transmission */
       statusCode = devreg->t_transm_status;
-    } else {
-      /* If terminal transmission is not ready, then terminal receipt must be
-       * ready */
+    } else if (devreg->t_recv_status != BUSY) {
+      /* If terminal transmission is busy, then terminal receipt must not be
+       * busy */
       statusCode = devreg->t_recv_status;
-      waitForTermRead = 1;
+      termRecvReady = 1;
+    } else {
+      PANIC();
     }
+  } else {
+    statusCode = devreg->d_status;
   }
+
+  /* Acknowledge the outstanding interrupt */
+  devreg->d_command = ACK;
 
   /* The first three lines are for Inter-process interrupts, Processor Local
    * Timer, Interval Timer. We have two sets of semaphores (each set with 8
    * semaphores) for terminal transmission and terminal receipt. */
-  int semIndex = (lineNum - 3 + waitForTermRead) * DEVPERINT + devNum;
+  int semIndex = (lineNum - 3 + termRecvReady) * DEVPERINT + devNum;
 
   /* Perform a V operation on the Nucleus maintained semaphore associated with
    * this (sub)device */
@@ -52,12 +54,16 @@ HIDDEN void handleDeviceInterrupt(state_t *savedExcState, int lineNum,
 HIDDEN void handlePLT(state_t *savedExcState) {
   /* Acknowledge the interrupt by reloading the timer with a 5ms time slice */
   setTIMER(QUANTUM);
+
   /* Copy the saved exception state into the current process's pcb */
   currentProc->p_s = *savedExcState;
+
   /* Update the accumulated CPU time (we have a 5ms slice) */
   currentProc->p_time += QUANTUM;
+
   /* Enqueue the current process back into the ready queue */
   insertProcQ(&readyQueue, currentProc);
+
   /* Call the scheduler */
   scheduler();
 }
@@ -65,16 +71,18 @@ HIDDEN void handlePLT(state_t *savedExcState) {
 HIDDEN void handleIntervalTimer(state_t *savedExcState) {
   /* Acknowledge the interrupt by reloading the interval timer with 100ms */
   LDIT(SYSTEM_TICK_INTERVAL);
+
   /* Unblock all processes waiting on the pseudo-clock semaphore */
   int *pseudoSem = &deviceSem[NUMDEVICES];
   pcb_PTR p;
   while ((p = removeBlocked(pseudoSem)) != NULL) {
     insertProcQ(&readyQueue, p);
-    /* Decrement soft-block count for each unblocked process */
     softBlockCnt--;
   }
+
   /* Reset pseudo-clock semaphore */
   *pseudoSem = 0;
+
   /* Return control to the current process */
   switchContext(savedExcState);
 }
@@ -91,12 +99,16 @@ void interruptHandler(state_t *savedExcState) {
   } else {
     /* Check non-timer device interrupts (interrupt lines 3 to 7) */
     int lineNum;
+    devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
+
+    /* Check which interrupt lines have pending interrupts */
     for (lineNum = 3; lineNum <= 7; lineNum++) {
       if (pendingInterrupts & STATUS_IM(lineNum)) {
-        /* Check the Interrupting Devices Bit Map for this line */
-        devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
-        unsigned int interruptDevBitMap = busRegArea->interrupt_dev[(lineNum - 3)];
+        unsigned int interruptDevBitMap =
+            busRegArea->interrupt_dev[(lineNum - 3)];
         int devNum;
+
+        /* Check which devices on this line have a pending interrupt */
         for (devNum = 0; devNum < DEVPERINT; devNum++) {
           if (interruptDevBitMap & (1 << devNum)) {
             handleDeviceInterrupt(savedExcState, lineNum, devNum);
