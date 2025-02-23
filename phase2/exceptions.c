@@ -40,7 +40,8 @@ HIDDEN void terminateProcHelper(pcb_PTR p) {
   }
 
   if (p == currentProc) {
-    /* p is the current process */
+    /* p is the current process, so remove p as a child of its parent */
+    outChild(currentProc);
     currentProc = NULL;
   } else {
     /* p may be waiting on the ready queue or blocked on the ASL */
@@ -181,17 +182,33 @@ HIDDEN void syscallHandler(state_t *savedExcState) {
   int num = savedExcState->s_a0;
 
   if (num >= 1 && num <= 8) {
-    syscalls[num](savedExcState);
+    if (savedExcState->s_status & STATUS_KUP) {
+      /* If previous mode was user mode (KUP = 1), simulate a program trap */
+      savedExcState->s_cause =
+          (savedExcState->s_cause & ~EXCCODE_MASK) | RI_EXCCODE;
+      passUpOrDie(savedExcState, GENERALEXCEPT);
+    } else {
+      /* If previous mode was kernel mode (KUP = 0), handle the syscall */
+      savedExcState->s_pc += 4; /* control of the current process should be
+                                   returned to the next instruction */
+      syscalls[num](savedExcState);
+    }
   } else {
-    /* TODO:
-     * - behavior for unknown system call?
-     * - PANIC?
-     */
-    savedExcState->s_v0 = -1;
+    passUpOrDie(savedExcState, GENERALEXCEPT);
   }
 }
 
-HIDDEN void programTrapHandler() {}
+HIDDEN void passUpOrDie(state_t *savedExcState, int exceptType) {
+  support_t *supportStruct = currentProc->p_supportStruct;
+  if (supportStruct == NULL) {
+    /* Die */
+    sysTerminateProc(savedExcState);
+  } else {
+    /* Pass up: Copy state and load new context */
+    supportStruct->sup_exceptState[exceptType] = *savedExcState;
+    loadContext(&supportStruct->sup_exceptContext[exceptType]);
+  }
+}
 
 void generalExceptionHandler() {
   state_t *savedExcState = (state_t *)BIOSDATAPAGE;
@@ -201,22 +218,14 @@ void generalExceptionHandler() {
     /* Interrupt exception: call our interrupt handler (section 3.6) */
     interruptHandler();
   } else if (excCode >= 1 && excCode <= 3) {
-    /* TODO: Call TLB exception handler (section 3.7.3) */
+    /* TLB exception */
+    passUpOrDie(savedExcState, PGFAULTEXCEPT);
   } else if ((excCode >= 4 && excCode <= 7) ||
              (excCode >= 9 && excCode <= 12)) {
-    /* TODO: Call Program Trap exception handler (section 3.7.2) */
+    /* Program trap exception */
+    passUpOrDie(savedExcState, GENERALEXCEPT);
   } else if (excCode == 8) {
-    if (savedExcState->s_status & STATUS_KUP) {
-      /* If previous mode was user mode (KUP = 1), handle program trap */
-      savedExcState->s_cause =
-          (savedExcState->s_cause & ~EXCCODE_MASK) | RI_EXCCODE;
-      programTrapHandler();
-    } else {
-      /* If previous mode was kernel mode (KUP = 0), handle the syscall */
-      savedExcState->s_pc += 4; /* control of the current process should be
-                                   returned to the next instruction */
-      syscallHandler(savedExcState);
-    }
+    syscallHandler(savedExcState);
   } else {
     /* Unknown exception code */
     PANIC();

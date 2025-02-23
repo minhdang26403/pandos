@@ -10,7 +10,9 @@
 
 /***************************************************************/
 
-extern void switchContext(state_t *state);
+extern void switchContext(state_t *);
+
+extern void loadContext(context_t *);
 
 extern void scheduler();
 

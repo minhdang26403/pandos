@@ -7,6 +7,13 @@ void switchContext(state_t *state) {
   LDST(state);
 }
 
+/* Centralized wrapper for LDCXT to switch to a new context */
+void loadContext(context_t *context) {
+  /* LDCXT is a critical kernel-mode operation that atomically updates SP,
+   * Status, and PC */
+  LDCXT(context->c_stackPtr, context->c_status, context->c_pc);
+}
+
 void scheduler() {
   pcb_PTR p = removeProcQ(&readyQueue);
   if (p == NULL) {
