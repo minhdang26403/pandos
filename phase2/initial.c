@@ -45,7 +45,7 @@ int main() {
   }
 
   /* 5. Load the system-wide Interval Timer with 100 milliseconds */
-  LDIT(100000);
+  LDIT(SYSTEM_TICK_INTERVAL);
 
   /* 6. Instantiate a single process */
   pcb_PTR p = allocPcb();

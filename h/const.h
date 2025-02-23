@@ -12,8 +12,8 @@
 #define WORDLEN			  4				  /* word size in bytes	*/
 #define MAXINT        2147483647
 
-/* maximum number of concurrent processes */
-#define MAXPROC       20
+#define MAXPROC       20        /* Maximum number of concurrent processes */
+#define QUANTUM       5000      /* Each process gets a time slice of 5 miliseconds */
 
 /* Status Register Bit Definitions */
 #define ZERO_MASK    (0U)
@@ -39,7 +39,7 @@
 /* Value for RI (10) shifted into position */
 #define RI_EXCCODE   (10 << 2)  /* 10 shifted left by 2 = 40 */
 #define CAUSE_EXCCODE(cause) (((cause) >> 2) & 0x1F)  /* Extract ExcCode (bits 2-6) */ 
-#define CAUSE_IP(cause) (((cause) >> 8) & 0xFF) /* Extract pending interrupt bits (bits 8-25) */
+#define CAUSE_IP(cause) ((cause) & 0xFF00) /* Extract pending interrupt bits (bits 8-15) */
 
 /* timer, timescale, TOD-LO and other bus regs */
 #define RAMBASEADDR		0x10000000
@@ -118,6 +118,8 @@
 #define	MIN(A,B)		((A) < (B) ? A : B)
 #define MAX(A,B)		((A) < (B) ? B : A)
 #define	ALIGNED(A)		(((unsigned)A & 0x3) == 0)
+
+#define SYSTEM_TICK_INTERVAL  100000 /* system-wide Interval Timer with 100 milliseconds */
 
 /* Macro to load the Interval Timer */
 #define LDIT(T)	((* ((cpu_t *) INTERVALTMR)) = (T) * (* ((cpu_t *) TIMESCALEADDR))) 

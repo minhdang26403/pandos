@@ -4,21 +4,7 @@
 #include "scheduler.h"
 #include "umps3/umps/libumps.h"
 
-HIDDEN void switchContext(state_t *state) {
-  /* LDST is a critical and dangerous instruction, so every call to context
-   * switch should be performed through this function */
-  LDST(state);
-}
-
-HIDDEN void waitOnSem(int *semaddr, state_t *savedExcState) {
-  currentProc->p_s = *savedExcState;
-  insertBlocked(semaddr, currentProc);
-  softBlockCnt++;
-  scheduler();
-}
-
-void sysCreateProc() {
-  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+HIDDEN void sysCreateProc(state_t *savedExcState) {
   pcb_PTR p = allocPcb();
 
   if (p == NULL) {
@@ -42,7 +28,7 @@ void sysCreateProc() {
   switchContext(savedExcState);
 }
 
-void terminateProcHelper(pcb_PTR p) {
+HIDDEN void terminateProcHelper(pcb_PTR p) {
   if (p == NULL) {
     return;
   }
@@ -70,16 +56,22 @@ void terminateProcHelper(pcb_PTR p) {
   procCnt--;
 }
 
-void sysTerminateProc() {
+HIDDEN void sysTerminateProc(state_t *savedExcState) {
   terminateProcHelper(currentProc);
   /* Call the scheduler to find another process to run without pushing the
    * currently running process to the queue again */
   scheduler();
 }
 
+HIDDEN void waitOnSem(int *semaddr, state_t *savedExcState) {
+  currentProc->p_s = *savedExcState;
+  insertBlocked(semaddr, currentProc);
+  softBlockCnt++;
+  scheduler();
+}
+
 /* SYS3 – Passeren (P operation on a semaphore) */
-void sysPasseren() {
-  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+HIDDEN void sysPasseren(state_t *savedExcState) {
   int *sem = (int *)savedExcState->s_a1;
 
   if (sem == NULL) {
@@ -102,8 +94,7 @@ void sysPasseren() {
 }
 
 /* SYS4 – Verhogen (V operation on a semaphore) */
-void sysVerhogen() {
-  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+HIDDEN void sysVerhogen(state_t *savedExcState) {
   int *sem = (int *)savedExcState->s_a1;
 
   if (sem == NULL) {
@@ -128,28 +119,16 @@ void sysVerhogen() {
 }
 
 /* SYS5 – Wait for IO Device (perform P on the appropriate device semaphore) */
-void sysWaitIO() {
-  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
-  int linenum = savedExcState->s_a1; /* Interrupt line number */
-  int devnum = savedExcState->s_a2;  /* Device number */
+HIDDEN void sysWaitIO(state_t *savedExcState) {
+  int lineNum = savedExcState->s_a1; /* Interrupt line number */
+  int devNum = savedExcState->s_a2;  /* Device number */
   int waitForTermRead =
       savedExcState->s_a3; /* TRUE if waiting for terminal read */
 
-  int semIndex;
-  if (linenum != TERMINT) {
-    /* The first three lines are for Inter-process interrupts, Processor Local
-     * Timer, Interval Timer */
-    semIndex = (linenum - 3) * DEVPERINT + devnum;
-  } else {
-    /* For terminal devices, there are two semaphores per device. If waiting for
-     * a terminal read, use the receive semaphore; otherwise, use the transmit
-     * semaphore. Terminals are indexed starting at 32 (since non-terminals take
-     * 4 * 8 = 32 entries)
-     * Note: terminal transmission is of higher priority than terminal receipt
-     */
-    semIndex = 32 + devnum * 2 + (waitForTermRead ? 1 : 0);
-  }
-
+  /* The first three lines are for Inter-process interrupts, Processor Local
+   * Timer, Interval Timer. We have two sets of semaphores (each set with 8
+   * semaphores) for terminal transmission and terminal receipt. */
+  int semIndex = (lineNum - 3 + waitForTermRead) * DEVPERINT + devNum;
   int *semaddr = &deviceSem[semIndex];
   (*semaddr)--;
 
@@ -160,15 +139,13 @@ void sysWaitIO() {
 
 /* SYS6 – Get CPU Time (return the accumulated CPU time of the current process)
  */
-void sysGetCPUTime() {
-  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+HIDDEN void sysGetCPUTime(state_t *savedExcState) {
   savedExcState->s_v0 = currentProc->p_time;
   switchContext(savedExcState);
 }
 
 /* SYS7 – Wait For Clock (perform P on the pseudo-clock semaphore) */
-void sysWaitForClock() {
-  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+HIDDEN void sysWaitForClock(state_t *savedExcState) {
   int *sem = &deviceSem[NUMDEVICES]; /* Pseudo–clock semaphore  */
   (*sem)--;
 
@@ -179,17 +156,16 @@ void sysWaitForClock() {
 
 /* SYS8 – Get Support Data (return pointer to the current process's support
  * structure) */
-void sysGetSupportData() {
-  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+HIDDEN void sysGetSupportData(state_t *savedExcState) {
   savedExcState->s_v0 = (int)currentProc->p_supportStruct;
   switchContext(savedExcState);
 }
 
 /* Define the function pointer type for syscalls */
-typedef void (*syscall_t)(void);
+typedef void (*syscall_t)(state_t *);
 
 /* Declare the syscall table, mapping syscall numbers (1-8) to functions */
-static syscall_t syscalls[] = {
+HIDDEN syscall_t syscalls[] = {
     NULL,             /* Index 0 (Unused, since syscalls are 1-based) */
     sysCreateProc,    /* SYS 1 */
     sysTerminateProc, /* SYS 2 */
@@ -201,12 +177,11 @@ static syscall_t syscalls[] = {
     sysGetSupportData /* SYS 8 */
 };
 
-void syscallHandler() {
-  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+HIDDEN void syscallHandler(state_t *savedExcState) {
   int num = savedExcState->s_a0;
 
   if (num >= 1 && num <= 8) {
-    syscalls[num]();
+    syscalls[num](savedExcState);
   } else {
     /* TODO:
      * - behavior for unknown system call?
@@ -216,7 +191,7 @@ void syscallHandler() {
   }
 }
 
-void programTrapHandler() {}
+HIDDEN void programTrapHandler() {}
 
 void generalExceptionHandler() {
   state_t *savedExcState = (state_t *)BIOSDATAPAGE;
@@ -240,15 +215,10 @@ void generalExceptionHandler() {
       /* If previous mode was kernel mode (KUP = 0), handle the syscall */
       savedExcState->s_pc += 4; /* control of the current process should be
                                    returned to the next instruction */
-      syscallHandler();
+      syscallHandler(savedExcState);
     }
   } else {
     /* Unknown exception code */
     PANIC();
   }
-
-  /*
-   * Note: to determine if the current process was executing in kernel-mode
-   * or user-mode, examine the KU bit of the Status register.
-   */
 }
