@@ -5,6 +5,8 @@
 #include "../h/scheduler.h"
 #include "umps3/umps/libumps.h"
 
+extern void debugA(int, int, int, int);
+
 /* Copy the contents of one state_t to another */
 void copyState(state_t *dest, state_t *src) {
   /* Copy scalar fields */

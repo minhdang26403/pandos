@@ -115,6 +115,8 @@ void	p5sys(),p8root(),child1(),child2(),p8leaf();
 extern void p5gen ();
 extern void p5mm ();
 
+extern void debugA(int, int, int, int);
+
 
 /* a procedure to print on terminal 0 */
 void print(char *msg) {

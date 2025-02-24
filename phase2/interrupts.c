@@ -19,39 +19,33 @@ HIDDEN void handleDeviceInterrupt(state_t *savedExcState, int lineNum,
   /* Get the device's device register */
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *devreg = &busRegArea->devreg[(lineNum - 3) * DEVPERINT + devNum];
+  
+  unsigned int statusCode;
+  int semIndex;
 
   if (lineNum == TERMINT) {
-    /* Check both sub-devices, prioritize transmit */
-    int handled = 0;
-
-    /* Transmitter (write) - higher priority */
-    if ((devreg->t_transm_status & TERMINT_STATUS_MASK) == CHAR_TRANSMITTED) {
-      int semIndex = (lineNum - 3) * DEVPERINT + devNum; /* 32-39 */
-      unsigned int statusCode = devreg->t_transm_status;
+    if ((devreg->t_transm_status & TERMINT_STATUS_MASK) != BUSY) {
+      /* Transmitter (write) - higher priority */
+      statusCode = devreg->t_transm_status;
       devreg->t_transm_command = ACK; /* Ack transmit */
-      VSemaphore(&deviceSem[semIndex], statusCode);
-      handled = 1;
-    }
-
-    /* Receiver (read) */
-    if ((devreg->t_recv_status & TERMINT_STATUS_MASK) == CHAR_RECEIVED) {
-      int semIndex = (lineNum - 3 + 1) * DEVPERINT + devNum; /* 40-47 */
-      unsigned int statusCode = devreg->t_recv_status;
+      semIndex = (lineNum - 3) * DEVPERINT + devNum; /* 32-39 */
+    } else if ((devreg->t_recv_status & TERMINT_STATUS_MASK) != BUSY) {
+      /* Receiver (read) */
+      statusCode = devreg->t_recv_status;
       devreg->t_recv_command = ACK; /* Ack receive */
-      VSemaphore(&deviceSem[semIndex], statusCode);
-      handled = 1;
-    }
-
-    if (!handled) {
-      PANIC(); /* No sub-device completed? */
+      semIndex = (lineNum - 3 + 1) * DEVPERINT + devNum; /* 40-47 */
+    } else {
+      /* Either transmission or receipt must be completed */
+      PANIC();
     }
   } else {
     /* Non-terminal devices */
-    unsigned int statusCode = devreg->d_status;
+    statusCode = devreg->d_status;
     devreg->d_command = ACK;
-    int semIndex = (lineNum - 3) * DEVPERINT + devNum;
-    VSemaphore(&deviceSem[semIndex], statusCode);
+    semIndex = (lineNum - 3) * DEVPERINT + devNum;
   }
+
+  VSemaphore(&deviceSem[semIndex], statusCode);
 
   switchContext(savedExcState);
 }
