@@ -1,3 +1,12 @@
 .vscode
-phase1/phase1Config
 .DS_Store
+
+phase1/phase1Config
+phase1/*.o
+phase1/kernel*
+phase1/*.umps
+
+phase2/phase2Config
+phase2/*.o
+phase2/kernel*
+phase2/*.umps

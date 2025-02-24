@@ -10,7 +10,7 @@ extern void test();
  * The definition of this function is given in p2test.c. This function will be
  * implemented in exceptions.c when the Support Level is implemented.
  */
-extern void uTLB_Refillhandler();
+extern void uTLB_RefillHandler();
 
 /* 1. Define Nucleus's global variables */
 int procCnt; /* The number of started, but not yet terminated processes */
@@ -22,10 +22,10 @@ pcb_PTR currentProc; /* Pointer to the pcb that is in the "running" state */
 int deviceSem[NUMDEVICES + 1]; /* One additional semaphore to support the Pseudo-clock */
 
 
-int main() {
+void main() {
   /* 2. Populate the Processor 0 Pass Up Vector */
   passupvector_t *passUpVector = (passupvector_t *)PASSUPVECTOR;
-  passUpVector->tlb_refll_handler = (memaddr) uTLB_Refillhandler;
+  passUpVector->tlb_refll_handler = (memaddr) uTLB_RefillHandler;
   passUpVector->tlb_refll_stackPtr = (memaddr) STACKTOP;
   passUpVector->execption_handler=  (memaddr) generalExceptionHandler;
   passUpVector->exception_stackPtr = (memaddr) STACKTOP;

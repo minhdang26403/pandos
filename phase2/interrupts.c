@@ -1,7 +1,8 @@
-#include "asl.h"
-#include "initial.h"
-#include "scheduler.h"
-#include "types.h"
+#include "../h/asl.h"
+#include "../h/exceptions.h"
+#include "../h/initial.h"
+#include "../h/scheduler.h"
+#include "umps3/umps/libumps.h"
 
 HIDDEN void VSemaphore(int *semaddr, unsigned int statusCode) {
   (*semaddr)++; /* V operation */
@@ -60,7 +61,7 @@ HIDDEN void handlePLT(state_t *savedExcState) {
   setTIMER(QUANTUM);
 
   /* Copy the saved exception state into the current process's pcb */
-  currentProc->p_s = *savedExcState;
+  copyState(&currentProc->p_s, savedExcState);
 
   /* Update the accumulated CPU time */
   cpu_t now;

@@ -1,8 +1,24 @@
-
-#include "initial.h"
-#include "pcb.h"
-#include "scheduler.h"
+#include "../h/asl.h"
+#include "../h/initial.h"
+#include "../h/interrupts.h"
+#include "../h/pcb.h"
+#include "../h/scheduler.h"
 #include "umps3/umps/libumps.h"
+
+/* Copy the contents of one state_t to another */
+void copyState(state_t *dest, state_t *src) {
+  /* Copy scalar fields */
+  dest->s_entryHI = src->s_entryHI;
+  dest->s_cause = src->s_cause;
+  dest->s_status = src->s_status;
+  dest->s_pc = src->s_pc;
+
+  /* Copy the register array */
+  int i;
+  for (i = 0; i < STATEREGNUM; i++) {
+      dest->s_reg[i] = src->s_reg[i];
+  }
+}
 
 HIDDEN void sysCreateProc(state_t *savedExcState) {
   pcb_PTR p = allocPcb();
@@ -15,7 +31,7 @@ HIDDEN void sysCreateProc(state_t *savedExcState) {
     state_t *statep = (state_t *)savedExcState->s_a1;
     support_t *supportp = (support_t *)savedExcState->s_a2;
 
-    p->p_s = *statep;
+    copyState(&p->p_s, statep);
     p->p_time = 0;
     p->p_semAdd = NULL;
     p->p_supportStruct = supportp;
@@ -75,7 +91,7 @@ HIDDEN void sysTerminateProc(state_t *savedExcState) {
 
 HIDDEN void waitOnSem(int *semaddr, state_t *savedExcState) {
   /* Save the exception state */
-  currentProc->p_s = *savedExcState;
+  copyState(&currentProc->p_s, savedExcState);
   /* Update the accumulated CPU time for the Current Process */
   cpu_t now;
   STCK(now);
@@ -171,6 +187,18 @@ HIDDEN void sysGetSupportData(state_t *savedExcState) {
   switchContext(savedExcState);
 }
 
+HIDDEN void passUpOrDie(state_t *savedExcState, int exceptType) {
+  support_t *supportStruct = currentProc->p_supportStruct;
+  if (supportStruct == NULL) {
+    /* Die */
+    sysTerminateProc(savedExcState);
+  } else {
+    /* Pass up: Copy state and load new context */
+    copyState(&supportStruct->sup_exceptState[exceptType], savedExcState);
+    loadContext(&supportStruct->sup_exceptContext[exceptType]);
+  }
+}
+
 /* Define the function pointer type for syscalls */
 typedef void (*syscall_t)(state_t *);
 
@@ -207,25 +235,13 @@ HIDDEN void syscallHandler(state_t *savedExcState) {
   }
 }
 
-HIDDEN void passUpOrDie(state_t *savedExcState, int exceptType) {
-  support_t *supportStruct = currentProc->p_supportStruct;
-  if (supportStruct == NULL) {
-    /* Die */
-    sysTerminateProc(savedExcState);
-  } else {
-    /* Pass up: Copy state and load new context */
-    supportStruct->sup_exceptState[exceptType] = *savedExcState;
-    loadContext(&supportStruct->sup_exceptContext[exceptType]);
-  }
-}
-
 void generalExceptionHandler() {
   state_t *savedExcState = (state_t *)BIOSDATAPAGE;
   unsigned int excCode = CAUSE_EXCCODE(savedExcState->s_cause);
 
   if (excCode == 0) {
     /* Interrupt exception: call our interrupt handler (section 3.6) */
-    interruptHandler();
+    interruptHandler(savedExcState);
   } else if (excCode >= 1 && excCode <= 3) {
     /* TLB exception */
     passUpOrDie(savedExcState, PGFAULTEXCEPT);
