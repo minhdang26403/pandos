@@ -25,20 +25,20 @@ HIDDEN void handleDeviceInterrupt(state_t *savedExcState, int lineNum,
     int handled = 0;
 
     /* Transmitter (write) - higher priority */
-    unsigned int transmStatus = devreg->t_transm_status & TERMINT_STATUS_MASK;
-    if (transmStatus == CHAR_TRANSMITTED) {
+    if ((devreg->t_transm_status & TERMINT_STATUS_MASK) == CHAR_TRANSMITTED) {
       int semIndex = (lineNum - 3) * DEVPERINT + devNum; /* 32-39 */
-      devreg->t_transm_command = ACK;                    /* Ack transmit */
-      VSemaphore(&deviceSem[semIndex], transmStatus);
+      unsigned int statusCode = devreg->t_transm_status;
+      devreg->t_transm_command = ACK; /* Ack transmit */
+      VSemaphore(&deviceSem[semIndex], statusCode);
       handled = 1;
     }
 
     /* Receiver (read) */
-    unsigned int recvStatus = devreg->t_recv_status & TERMINT_STATUS_MASK;
-    if (recvStatus == CHAR_RECEIVED) {
+    if ((devreg->t_recv_status & TERMINT_STATUS_MASK) == CHAR_RECEIVED) {
       int semIndex = (lineNum - 3 + 1) * DEVPERINT + devNum; /* 40-47 */
-      devreg->t_recv_command = ACK;                          /* Ack receive */
-      VSemaphore(&deviceSem[semIndex], recvStatus);
+      unsigned int statusCode = devreg->t_recv_status;
+      devreg->t_recv_command = ACK; /* Ack receive */
+      VSemaphore(&deviceSem[semIndex], statusCode);
       handled = 1;
     }
 
@@ -114,7 +114,6 @@ void interruptHandler(state_t *savedExcState) {
         unsigned int interruptDevBitMap =
             busRegArea->interrupt_dev[(lineNum - 3)];
         int devNum;
-
         /* Check which devices on this line have a pending interrupt */
         for (devNum = 0; devNum < DEVPERINT; devNum++) {
           if (interruptDevBitMap & (1 << devNum)) {
