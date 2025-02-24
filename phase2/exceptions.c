@@ -18,7 +18,7 @@ void copyState(state_t *dest, state_t *src) {
   /* Copy the register array */
   int i;
   for (i = 0; i < STATEREGNUM; i++) {
-      dest->s_reg[i] = src->s_reg[i];
+    dest->s_reg[i] = src->s_reg[i];
   }
 }
 
@@ -60,7 +60,7 @@ HIDDEN void terminateProcHelper(pcb_PTR p) {
   if (p == currentProc) {
     /* p is the current process, so remove p as a child of its parent */
     outChild(currentProc);
-    currentProc = NULL;
+    currentProc = NULL; /* TODO: we may not need to set this */
   } else {
     /* p may be waiting on the ready queue or blocked on the ASL */
     pcb_PTR removedProc = outProcQ(&readyQueue, p);
@@ -71,12 +71,13 @@ HIDDEN void terminateProcHelper(pcb_PTR p) {
         PANIC();
       }
       int *semaddr = p->p_semAdd;
-      if (semaddr != NULL &&
-          (semaddr < deviceSem || semaddr >= deviceSem + NUMDEVICES)) {
+      if (semaddr >= deviceSem && semaddr < deviceSem + NUMDEVICES) {
+        /* Device semaphore will be adjusted in device interrupt handler */
+        softBlockCnt--;
+      } else {
         /* Adjust non-device semaphore */
         (*semaddr)++;
       }
-      softBlockCnt--; /* Any blocked process reduces soft block count */
     }
   }
 
@@ -99,7 +100,7 @@ HIDDEN void waitOnSem(int *semaddr, state_t *savedExcState) {
   STCK(now);
   currentProc->p_time += now - quantumStartTime;
   insertBlocked(semaddr, currentProc);
-  softBlockCnt++;
+  currentProc = NULL;
   scheduler();
 }
 
@@ -140,7 +141,6 @@ HIDDEN void sysVerhogen(state_t *savedExcState) {
     /* Unblock one process waiting on this semaphore, if any */
     pcb_PTR p = removeBlocked(sem);
     if (p != NULL) {
-      softBlockCnt--;
       insertProcQ(&readyQueue, p);
     }
   }
@@ -162,7 +162,10 @@ HIDDEN void sysWaitIO(state_t *savedExcState) {
   int semIndex = (lineNum - 3 + waitForTermRead) * DEVPERINT + devNum;
   int *semaddr = &deviceSem[semIndex];
   (*semaddr)--;
-  waitOnSem(semaddr, savedExcState); /* always block */
+  if (*semaddr < 0) {
+    softBlockCnt++; /* increment soft-block count since the process is waiting for IO device */
+    waitOnSem(semaddr, savedExcState); /* always block */  
+  }
 }
 
 /* SYS6 – Get CPU Time (return the accumulated CPU time of the current process)
@@ -179,7 +182,10 @@ HIDDEN void sysGetCPUTime(state_t *savedExcState) {
 HIDDEN void sysWaitForClock(state_t *savedExcState) {
   int *sem = &deviceSem[NUMDEVICES]; /* Pseudo–clock semaphore  */
   (*sem)--;
-  waitOnSem(sem, savedExcState); /* always block */
+  if (*sem < 0) {
+    softBlockCnt++;
+    waitOnSem(sem, savedExcState); /* always block */  
+  }
 }
 
 /* SYS8 – Get Support Data (return pointer to the current process's support
@@ -233,6 +239,7 @@ HIDDEN void syscallHandler(state_t *savedExcState) {
       syscalls[num](savedExcState);
     }
   } else {
+    /* TODO: may need to increment PC by 4 here */
     passUpOrDie(savedExcState, GENERALEXCEPT);
   }
 }

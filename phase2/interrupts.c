@@ -4,22 +4,12 @@
 #include "../h/scheduler.h"
 #include "umps3/umps/libumps.h"
 
-HIDDEN void VSemaphore(int *semaddr, unsigned int statusCode) {
-  (*semaddr)++; /* V operation */
-  pcb_PTR p = removeBlocked(semaddr);
-  if (p != NULL) {
-    p->p_s.s_v0 = statusCode; /* Return status to process */
-    softBlockCnt--;
-    insertProcQ(&readyQueue, p);
-  }
-}
-
 HIDDEN void handleDeviceInterrupt(state_t *savedExcState, int lineNum,
                                   int devNum) {
   /* Get the device's device register */
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *devreg = &busRegArea->devreg[(lineNum - 3) * DEVPERINT + devNum];
-  
+
   unsigned int statusCode;
   int semIndex;
 
@@ -27,12 +17,12 @@ HIDDEN void handleDeviceInterrupt(state_t *savedExcState, int lineNum,
     if ((devreg->t_transm_status & TERMINT_STATUS_MASK) != BUSY) {
       /* Transmitter (write) - higher priority */
       statusCode = devreg->t_transm_status;
-      devreg->t_transm_command = ACK; /* Ack transmit */
+      devreg->t_transm_command = ACK;                /* Ack transmit */
       semIndex = (lineNum - 3) * DEVPERINT + devNum; /* 32-39 */
     } else if ((devreg->t_recv_status & TERMINT_STATUS_MASK) != BUSY) {
       /* Receiver (read) */
       statusCode = devreg->t_recv_status;
-      devreg->t_recv_command = ACK; /* Ack receive */
+      devreg->t_recv_command = ACK;                      /* Ack receive */
       semIndex = (lineNum - 3 + 1) * DEVPERINT + devNum; /* 40-47 */
     } else {
       /* Either transmission or receipt must be completed */
@@ -45,9 +35,22 @@ HIDDEN void handleDeviceInterrupt(state_t *savedExcState, int lineNum,
     semIndex = (lineNum - 3) * DEVPERINT + devNum;
   }
 
-  VSemaphore(&deviceSem[semIndex], statusCode);
+  /* Perform a V operation on the Nucleus maintained semaphore associated with
+   * this (sub)device */
+  deviceSem[semIndex]++;
+  pcb_PTR p = removeBlocked(&deviceSem[semIndex]);
+  if (p != NULL) {
+    p->p_s.s_v0 = statusCode; /* Return status to process */
+    softBlockCnt--;
+    insertProcQ(&readyQueue, p);
+  }
 
-  switchContext(savedExcState);
+  if (currentProc == NULL) {
+    scheduler();
+  } else {
+    /* Return control to the current process */
+    switchContext(savedExcState);
+  }
 }
 
 HIDDEN void handlePLT(state_t *savedExcState) {
@@ -64,6 +67,7 @@ HIDDEN void handlePLT(state_t *savedExcState) {
 
   /* Enqueue the current process back into the ready queue */
   insertProcQ(&readyQueue, currentProc);
+  currentProc = NULL;
 
   /* Call the scheduler */
   scheduler();
@@ -84,8 +88,12 @@ HIDDEN void handleIntervalTimer(state_t *savedExcState) {
   /* Reset pseudo-clock semaphore */
   *pseudoSem = 0;
 
-  /* Return control to the current process */
-  switchContext(savedExcState);
+  if (currentProc == NULL) {
+    scheduler();
+  } else {
+    /* Return control to the current process */
+    switchContext(savedExcState);
+  }
 }
 
 void interruptHandler(state_t *savedExcState) {
