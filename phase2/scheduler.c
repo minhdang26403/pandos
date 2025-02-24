@@ -18,30 +18,33 @@ void loadContext(context_t *context) {
 }
 
 void scheduler() {
-  pcb_PTR p = removeProcQ(&readyQueue);
-  if (p == NULL) {
-    /* The Ready Queue is empty */
+  while (1) {
+    pcb_PTR p = removeProcQ(&readyQueue);
+    if (p == NULL) {
+      /* The Ready Queue is empty */
 
-    if (procCnt == 0) {
-      /* Job well done */
-      HALT();
-    } else if (procCnt > 0 && softBlockCnt > 0) {
-      /* Enable global interrupts and disable the PLT */
-      unsigned int currentStatus = getSTATUS();
-      currentStatus |= STATUS_IEC;
-      currentStatus &= ~STATUS_TE;
-      setSTATUS(currentStatus);
-      /* Waiting for a device interrupt to occur */
-      WAIT();
-    } else {
-      /* Deadlock or abnormal case */
-      PANIC();
+      if (procCnt == 0) {
+        /* Job well done */
+        HALT();
+      } else if (procCnt > 0 && softBlockCnt > 0) {
+        /* Enable global interrupts and disable the PLT */
+        unsigned int currentStatus = getSTATUS();
+        currentStatus |= STATUS_IEC;
+        currentStatus &= ~STATUS_TE;
+        setSTATUS(currentStatus);
+        /* Waiting for a device interrupt to occur */
+        WAIT();
+        continue;
+      } else {
+        /* Deadlock or abnormal case */
+        PANIC();
+      }
     }
-  }
 
-  /* Set new current process and start its quantum */
-  currentProc = p;
-  STCK(quantumStartTime);
-  setTIMER(QUANTUM); /* Each process gets a time slice of 5ms */
-  switchContext(&p->p_s);
+    /* Set new current process and start its quantum */
+    currentProc = p;
+    STCK(quantumStartTime);
+    setTIMER(QUANTUM); /* Each process gets a time slice of 5ms */
+    switchContext(&p->p_s);
+  }
 }
