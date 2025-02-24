@@ -27,6 +27,7 @@
 #define STATUS_KUO   (1U << 5)  /* Old Kernel/User Mode */
 
 #define STATUS_IM(i) (1U << (8 + (i))) /* Interrupt Mask (bits 8-15) */
+#define STATUS_IM_ALL_ON  0xFF00
 
 #define STATUS_BEV   (1U << 22) /* Bootstrap Exception Vector */
 #define STATUS_TE    (1U << 27) /* Local Timer Enable */
