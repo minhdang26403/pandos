@@ -51,7 +51,7 @@ HIDDEN void terminateProcHelper(pcb_PTR p) {
 
   /* Recursively terminate all child processes first */
   pcb_PTR child;
-  while ((child = removeChild(p))) {
+  while ((child = removeChild(p)) != NULL) {
     terminateProcHelper(child);
   }
 
