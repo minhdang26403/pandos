@@ -1,11 +1,20 @@
+/************************** EXCEPTIONS.C ******************************
+ *
+ *  The Exception Handling Module.
+ *
+ *  Written by Dang Truong
+ */
+
+/***************************************************************/
+
+#include "../h/exceptions.h"
+
 #include "../h/asl.h"
 #include "../h/initial.h"
 #include "../h/interrupts.h"
 #include "../h/pcb.h"
 #include "../h/scheduler.h"
 #include "umps3/umps/libumps.h"
-
-extern void debugA(int, int, int, int);
 
 /* Copy the contents of one state_t to another */
 void copyState(state_t *dest, state_t *src) {
@@ -60,25 +69,21 @@ HIDDEN void terminateProcHelper(pcb_PTR p) {
   if (p == currentProc) {
     /* p is the current process, so remove p as a child of its parent */
     outChild(currentProc);
-    currentProc = NULL; /* TODO: we may not need to set this */
-  } else {
-    /* p may be waiting on the ready queue or blocked on the ASL */
-    pcb_PTR removedProc = outProcQ(&readyQueue, p);
-    if (removedProc == NULL) {
-      /* Not on ready queue, must be blocked */
-      if (outBlocked(p) == NULL) {
-        /* Process not found anywhere */
-        PANIC();
-      }
-      int *semaddr = p->p_semAdd;
-      if (semaddr >= deviceSem && semaddr < deviceSem + NUMDEVICES) {
-        /* Device semaphore will be adjusted in device interrupt handler */
-        softBlockCnt--;
-      } else {
-        /* Adjust non-device semaphore */
-        (*semaddr)++;
-      }
+    currentProc = NULL;
+  } else if (p->p_semAdd != NULL) {
+    /* p is blocked on the ASL */
+    int *sem = p->p_semAdd;
+    outBlocked(p);
+    if (sem >= deviceSem && sem < deviceSem + NUMDEVICES) {
+      /* Device semaphore will be adjusted in device interrupt handler */
+      softBlockCnt--;
+    } else {
+      /* Adjust non-device semaphore */
+      (*sem)++;
     }
+  } else {
+    /* p is on the ready queue */
+    outProcQ(&readyQueue, p);
   }
 
   freePcb(p);
@@ -92,14 +97,14 @@ HIDDEN void sysTerminateProc(state_t *savedExcState) {
   scheduler();
 }
 
-HIDDEN void waitOnSem(int *semaddr, state_t *savedExcState) {
+HIDDEN void waitOnSem(int *sem, state_t *savedExcState) {
   /* Save the exception state */
   copyState(&currentProc->p_s, savedExcState);
   /* Update the accumulated CPU time for the Current Process */
   cpu_t now;
   STCK(now);
   currentProc->p_time += now - quantumStartTime;
-  insertBlocked(semaddr, currentProc);
+  insertBlocked(sem, currentProc);
   currentProc = NULL;
   scheduler();
 }
@@ -107,35 +112,17 @@ HIDDEN void waitOnSem(int *semaddr, state_t *savedExcState) {
 /* SYS3 – Passeren (P operation on a semaphore) */
 HIDDEN void sysPasseren(state_t *savedExcState) {
   int *sem = (int *)savedExcState->s_a1;
-
-  if (sem == NULL) {
-    /* Caller passed in an valid semaphore address */
-    savedExcState->s_v0 = -1;
-    /* Return to the current process with an error code */
-    switchContext(savedExcState);
-  }
-
   (*sem)--;
   if (*sem < 0) {
     waitOnSem(sem, savedExcState);
   }
 
-  /* TODO: should we support return value for P & V operations */
-  savedExcState->s_v0 = 0;
   switchContext(savedExcState);
 }
 
 /* SYS4 – Verhogen (V operation on a semaphore) */
 HIDDEN void sysVerhogen(state_t *savedExcState) {
   int *sem = (int *)savedExcState->s_a1;
-
-  if (sem == NULL) {
-    /* Caller passed in an valid semaphore address */
-    savedExcState->s_v0 = -1;
-    /* Return to the current process with an error code */
-    switchContext(savedExcState);
-  }
-
   (*sem)++;
   if (*sem <= 0) {
     /* Unblock one process waiting on this semaphore, if any */
@@ -145,27 +132,26 @@ HIDDEN void sysVerhogen(state_t *savedExcState) {
     }
   }
 
-  savedExcState->s_v0 = 0;
   switchContext(savedExcState);
 }
 
 /* SYS5 – Wait for IO Device (perform P on the appropriate device semaphore) */
 HIDDEN void sysWaitIO(state_t *savedExcState) {
-  int lineNum = savedExcState->s_a1; /* Interrupt line number */
-  int devNum = savedExcState->s_a2;  /* Device number */
+  int lineNum = savedExcState->s_a1; /* Interrupt line number (3-7) */
+  int devNum = savedExcState->s_a2;  /* Device number (0-7) */
   int waitForTermRead =
-      savedExcState->s_a3; /* TRUE if waiting for terminal read */
+      savedExcState->s_a3; /* 1 if waiting for terminal read, 0 for write */
 
-  /* The first three lines are for Inter-process interrupts, Processor Local
-   * Timer, Interval Timer. We have two sets of semaphores (each set with 8
-   * semaphores) for terminal transmission and terminal receipt. */
-  int semIndex = (lineNum - 3 + waitForTermRead) * DEVPERINT + devNum;
-  int *semaddr = &deviceSem[semIndex];
-  (*semaddr)--;
-  if (*semaddr < 0) {
-    softBlockCnt++; /* increment soft-block count since the process is waiting for IO device */
-    waitOnSem(semaddr, savedExcState); /* always block */  
-  }
+  /* Calculate semaphore index:
+    - Lines 3-6: 0-31 (non-terminals)
+    - Line 7 (TERMINT): 32-39 (write), 40-47 (read)
+    - Offset from DISKINT (line 3), adjust by waitForTermRead for terminal reads
+  */
+  int semIdx = (lineNum - DISKINT + waitForTermRead) * DEVPERINT + devNum;
+  int *sem = &deviceSem[semIdx];
+  (*sem)--;
+  softBlockCnt++;                /* Process now waiting for I/O */
+  waitOnSem(sem, savedExcState); /* Always block */
 }
 
 /* SYS6 – Get CPU Time (return the accumulated CPU time of the current process)
@@ -180,12 +166,10 @@ HIDDEN void sysGetCPUTime(state_t *savedExcState) {
 
 /* SYS7 – Wait For Clock (perform P on the pseudo-clock semaphore) */
 HIDDEN void sysWaitForClock(state_t *savedExcState) {
-  int *sem = &deviceSem[NUMDEVICES]; /* Pseudo–clock semaphore  */
+  int *sem = &deviceSem[PSEUDOCLOCK]; /* Pseudo–clock semaphore  */
   (*sem)--;
-  if (*sem < 0) {
-    softBlockCnt++;
-    waitOnSem(sem, savedExcState); /* always block */  
-  }
+  softBlockCnt++;                /* Process now waiting for pseudo-clock */
+  waitOnSem(sem, savedExcState); /* Always block */
 }
 
 /* SYS8 – Get Support Data (return pointer to the current process's support
@@ -239,7 +223,6 @@ HIDDEN void syscallHandler(state_t *savedExcState) {
       syscalls[num](savedExcState);
     }
   } else {
-    /* TODO: may need to increment PC by 4 here */
     passUpOrDie(savedExcState, GENERALEXCEPT);
   }
 }
@@ -249,7 +232,7 @@ void generalExceptionHandler() {
   unsigned int excCode = CAUSE_EXCCODE(savedExcState->s_cause);
 
   if (excCode == 0) {
-    /* Interrupt exception: call our interrupt handler (section 3.6) */
+    /* Interrupt exception */
     interruptHandler(savedExcState);
   } else if (excCode >= 1 && excCode <= 3) {
     /* TLB exception */
@@ -259,6 +242,7 @@ void generalExceptionHandler() {
     /* Program trap exception */
     passUpOrDie(savedExcState, GENERALEXCEPT);
   } else if (excCode == 8) {
+    /* Syscall */
     syscallHandler(savedExcState);
   } else {
     /* Unknown exception code */

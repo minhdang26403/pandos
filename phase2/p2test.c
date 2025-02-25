@@ -115,7 +115,6 @@ void	p5sys(),p8root(),child1(),child2(),p8leaf();
 extern void p5gen ();
 extern void p5mm ();
 
-extern void debugA(int, int, int, int);
 
 
 /* a procedure to print on terminal 0 */
@@ -518,7 +517,7 @@ void p5sys() {
 /* p5 -- SYS5 test process */
 void p5() {
 	print("p5 starts\n");
-		
+  
 	/* cause a pgm trap access some non-existent memory */	
 	*p5MemLocation = *p5MemLocation + 1;		 /* Should cause a program trap */
 }

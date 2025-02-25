@@ -65,6 +65,9 @@
 #define PRNTINT 		  6
 #define TERMINT			  7
 
+/* Bit mask for device number in interrupting device bitmap */
+#define DEV_BIT(devNum) (1 << (devNum))
+
 #define DEVINTNUM		  5		  /* interrupt lines used by devices */
 #define DEVPERINT		  8		  /* devices per interrupt line */
 #define DEVREGLEN		  4		  /* device register field length in bytes, and regs per dev */	
@@ -77,6 +80,7 @@
  *    NUMDEVICES = (4 x 8) + (8 x 2) = 48
  */
 #define NUMDEVICES    48
+#define PSEUDOCLOCK   NUMDEVICES  /* Index of the pseudo-clock semaphore in the device semaphore array */
 
 /* device register field number for non-terminal devices */
 #define STATUS			  0

@@ -1,3 +1,14 @@
+/************************** SCHEDULER.C ******************************
+ *
+ *  The Scheduler Module.
+ *
+ *  Written by Dang Truong
+ */
+
+/***************************************************************/
+
+#include "../h/scheduler.h"
+
 #include "../h/initial.h"
 #include "umps3/umps/libumps.h"
 

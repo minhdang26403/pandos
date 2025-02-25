@@ -2,15 +2,15 @@
 #define INITIAL
 
 /************************** INITIAL.H ******************************
-*
-*  The externals declaration file for the Nucleus Initialization
-*    Module.
-*
-*  Written by Dang Truong
-*/
+ *
+ *  The externals declaration file for the Nucleus Initialization
+ *    Module.
+ *
+ *  Written by Dang Truong
+ */
 
 #include "../h/const.h"
-#include "../h/pcb.h"
+#include "../h/types.h"
 
 extern int procCnt;
 extern int softBlockCnt;

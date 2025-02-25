@@ -1,6 +1,17 @@
+/************************** INITIAL.C ******************************
+ *
+ *  The Nucleus Initialization Module.
+ *
+ *  Written by Dang Truong
+ */
+
+/***************************************************************/
+
 #include "../h/initial.h"
+
 #include "../h/asl.h"
 #include "../h/exceptions.h"
+#include "../h/pcb.h"
 #include "../h/scheduler.h"
 
 /* Test function of phase 2 */
@@ -72,11 +83,4 @@ void main() {
 
   /* 7. Call the scheduler */
   scheduler();
-}
-
-void debugA(int var1, int var2, int var3, int var4) {
-  var1 = var1;
-  var2 = var2;
-  var3 = var3;
-  var4 = var4;
 }
