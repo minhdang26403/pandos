@@ -1,8 +1,21 @@
 /************************** INITIAL.C ******************************
  *
- *  The Nucleus Initialization Module.
+ * The Nucleus Initialization Module.
+ * 
+ * Description:
+ *   This module implements the Nucleus Initialization routines for Phase 2. It sets up
+ *   the environment needed formultiprogramming by:
+ *     - Defining relevant global variables for Nucleus (procCnt, softBlockCnt,
+ *       readyQueue, currentProc, deviceSem).
+ *     - Populating the Processor 0 Pass Up Vector with the appropriate handler
+ *       addresses and stack pointers.
+ *     - Initializing the PCB free list and the Active Semaphore List (ASL).
+ *     - Setting up Nucleus maintained global variables
+ *     - Loading the system-wide Interval Timer with a 100-millisecond tick.
+ *     - Instantiating an initial test process with the proper processor state.
+ *     - Calling the scheduler to dispatch processes.
  *
- *  Written by Dang Truong
+ * Written by Dang Truong, Loc Pham
  */
 
 /***************************************************************/
@@ -34,6 +47,32 @@ pcb_PTR currentProc; /* Pointer to the pcb that is in the "running" state */
 int deviceSem[NUMDEVICES +
               1]; /* One additional semaphore to support the Pseudo-clock */
 
+/*
+ * Function: main
+ * --------------------
+ * Purpose:
+ *   Performs the Nucleus initialization for Phase 2.
+ *   This includes:
+ *     - Populating the Processor 0 Pass Up Vector with TLB refill and exception
+ *       handler addresses and corresponding stack pointers.
+ *     - Initializing the PCB free list and Active Semaphore List.
+ *     - Setting the Nucleus global variables (process count, soft-block count,
+ *       ready queue, and current process) to their initial states.
+ *     - Loading the system-wide Interval Timer with a 100 millisecond interval.
+ *     - Creating an initial test process, configuring its processor state with:
+ *         * Interrupts enabled.
+ *         * Processor Local Timer enabled.
+ *         * Kernel mode activated.
+ *         * Stack pointer set to the top of RAM.
+ *         * Program counter (and t9) set to the test function.
+ *     - Invoking the scheduler to start process dispatching.
+ *
+ * Parameters:
+ *   None.
+ *
+ * Returns:
+ *   This function does not return.
+ */
 void main() {
   /* 2. Populate the Processor 0 Pass Up Vector */
   passupvector_t *passUpVector = (passupvector_t *)PASSUPVECTOR;
