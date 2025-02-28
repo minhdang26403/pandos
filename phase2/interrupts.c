@@ -25,6 +25,7 @@
 #include "../h/asl.h"
 #include "../h/exceptions.h"
 #include "../h/initial.h"
+#include "../h/pcb.h"
 #include "../h/scheduler.h"
 #include "umps3/umps/libumps.h"
 
@@ -93,6 +94,7 @@ HIDDEN void handleDeviceInterrupt(state_t *savedExcState, int lineNum,
   }
 
   if (currentProc == NULL) {
+    /* Wake up from WAIT state */
     scheduler();
   } else {
     /* Return control to the current process */
@@ -172,6 +174,7 @@ HIDDEN void handleIntervalTimer(state_t *savedExcState) {
   *pseudoSem = 0;
 
   if (currentProc == NULL) {
+    /* Wake up from WAIT state */
     scheduler();
   } else {
     /* Return control to the current process */

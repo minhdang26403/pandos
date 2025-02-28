@@ -3,8 +3,7 @@
 
 /************************** INITIAL.H ******************************
  *
- *  The externals declaration file for the Nucleus Initialization
- *    Module.
+ *  The externals declaration file for the Nucleus Initialization Module.
  *
  *  Written by Dang Truong
  */

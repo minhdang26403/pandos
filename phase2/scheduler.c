@@ -1,7 +1,7 @@
 /************************** SCHEDULER.C ******************************
  *
  * The Scheduler Module.
- * 
+ *
  * Description:
  *   This module implements the scheduler functionality for Phase 2.
  *   It is responsible for dispatching processes from the ready queue using a
@@ -17,6 +17,7 @@
 #include "../h/scheduler.h"
 
 #include "../h/initial.h"
+#include "../h/pcb.h"
 #include "umps3/umps/libumps.h"
 
 /* Global variable to track when the current process's quantum started */
@@ -37,9 +38,7 @@ cpu_t quantumStartTime = 0;
  * Returns:
  *   This function does not return if the context switch is successful.
  */
-void switchContext(state_t *state) {
-  LDST(state);
-}
+void switchContext(state_t *state) { LDST(state); }
 
 /**
  * Function: loadContext
@@ -50,10 +49,10 @@ void switchContext(state_t *state) {
  *   a centralized wrapper for LDCXT to switch to a new context.
  *
  * Parameters:
- *   context - A pointer to a context_t structure containing the following fields:
- *             - c_stackPtr: The new stack pointer value.
- *             - c_status:   The new status register value.
- *             - c_pc:       The new program counter value.
+ *   context: A pointer to context_t that contains the following fields:
+ *    - c_stackPtr: The new stack pointer value.
+ *    - c_status:   The new status register value.
+ *    - c_pc:       The new program counter value.
  *
  * Returns:
  *   This function does not return if the context load is successful.

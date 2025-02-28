@@ -1,7 +1,7 @@
 /************************** INITIAL.C ******************************
  *
  * The Nucleus Initialization Module.
- * 
+ *
  * Description:
  *   This module implements the Nucleus Initialization routines for Phase 2. It sets up
  *   the environment needed formultiprogramming by:

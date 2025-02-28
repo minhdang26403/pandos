@@ -79,10 +79,13 @@ HIDDEN void sysCreateProc(state_t *savedExcState) {
     state_t *statep = (state_t *)savedExcState->s_a1;
     support_t *supportp = (support_t *)savedExcState->s_a2;
 
+    /* Initialize all fields of the new process */
     copyState(&p->p_s, statep);
     p->p_time = 0;
     p->p_semAdd = NULL;
     p->p_supportStruct = supportp;
+    
+    /* Make this process alive */
     insertProcQ(&readyQueue, p);
     insertChild(currentProc, p);
     procCnt++;
@@ -138,6 +141,7 @@ HIDDEN void terminateProcHelper(pcb_PTR p) {
     outProcQ(&readyQueue, p);
   }
 
+  /* Clean up the process */
   freePcb(p);
   procCnt--;
 }
@@ -185,6 +189,7 @@ HIDDEN void waitOnSem(int *sem, state_t *savedExcState) {
   cpu_t now;
   STCK(now);
   currentProc->p_time += now - quantumStartTime;
+  /* Block the current process and find another process to run */
   insertBlocked(sem, currentProc);
   currentProc = NULL;
   scheduler();
@@ -412,8 +417,9 @@ HIDDEN void syscallHandler(state_t *savedExcState) {
       passUpOrDie(savedExcState, GENERALEXCEPT);
     } else {
       /* If previous mode was kernel mode (KUP = 0), handle the syscall */
-      savedExcState->s_pc += 4; /* control of the current process should be
-                                   returned to the next instruction */
+      
+      savedExcState->s_pc += 4;     /* control of the current process should be
+                                       returned to the next instruction */
       syscalls[num](savedExcState);
     }
   } else {
