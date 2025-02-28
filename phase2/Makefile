@@ -49,6 +49,11 @@ kernel: p2test.o $(OBJS)
 %.o: %.c $(DEFS)
 	$(CC) $(CFLAGS) $<
 
+asl.o: ../phase1/asl.c $(DEFS)
+	$(CC) $(CFLAGS) $<
+
+pcb.o: ../phase1/pcb.c $(DEFS)
+	$(CC) $(CFLAGS) $<
 
 clean:
 	rm -f *.o term*.umps kernel kernel.*.umps
