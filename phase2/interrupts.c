@@ -1,8 +1,21 @@
 /************************** INTERRUPTS.C ******************************
  *
- *  The Device Interrupt Handling Module.
+ * The Device Interrupt Handling Module.
+ * 
+ * Description:
+ *   This module implements the device interrupt handling routines for Phase 2.
+ *   It processes both timer and non-timer interrupts by:
+ *     - Handling Processor Local Timer (PLT) interrupts to preempt the running
+ *       process.
+ *     - Handling Interval Timer interrupts to unblock processes waiting on the
+ *       pseudo-clock.
+ *     - Handling device interrupts (including terminal devices) by acknowledging
+ *       the interrupt, performing the corresponding V operation on the appropriate
+ *       semaphore, and unblocking any waiting process.
+ *   The module uses helper functions to encapsulate the specific handling logic
+ *   for different types of interrupts.
  *
- *  Written by Dang Truong
+ * Written by Dang Truong, Loc Pham
  */
 
 /***************************************************************/
@@ -15,6 +28,26 @@
 #include "../h/scheduler.h"
 #include "umps3/umps/libumps.h"
 
+/**
+ * Function: handleDeviceInterrupt
+ * -------------------------------
+ * Purpose:
+ *   Handles interrupts for non-timer devices including terminal devices. The
+ *   function calculates the proper device register address, acknowledges the
+ *   interrupt by sending an ACK command, and performs a V operation on the
+ *   corresponding Nucleus-maintained semaphore. If a process is waiting on the
+ *   device, it is unblocked and its return status is set accordingly.
+ *
+ * Parameters:
+ *   savedExcState - Pointer to the saved exception state at the time of the
+ *                   interrupt.
+ *   lineNum       - The interrupt line number where the device interrupt occurred.
+ *   devNum        - The device number on the specified interrupt line.
+ *
+ * Returns:
+ *   This function does not return normally; control is transferred either via
+ *   switchContext or scheduler.
+ */
 HIDDEN void handleDeviceInterrupt(state_t *savedExcState, int lineNum,
                                   int devNum) {
   /* Get the device's device register */
@@ -67,6 +100,24 @@ HIDDEN void handleDeviceInterrupt(state_t *savedExcState, int lineNum,
   }
 }
 
+/**
+ * Function: handlePLT
+ * ---------------------
+ * Purpose:
+ *   Handles Processor Local Timer (PLT) interrupts, which signal that the
+ *   current process's time slice (quantum) has expired. This routine:
+ *     - Reloads the timer for a new 5ms quantum.
+ *     - Updates the current process's CPU time.
+ *     - Saves its state and enqueues it back onto the ready queue.
+ *     - Calls the scheduler to dispatch the next process.
+ *
+ * Parameters:
+ *   savedExcState - Pointer to the saved exception state at the time of the
+ *                   PLT interrupt.
+ *
+ * Returns:
+ *   This function does not return normally; control is transferred via scheduler.
+ */
 HIDDEN void handlePLT(state_t *savedExcState) {
   /* Acknowledge the interrupt by reloading the timer with a 5ms time slice */
   setTIMER(QUANTUM);
@@ -87,6 +138,24 @@ HIDDEN void handlePLT(state_t *savedExcState) {
   scheduler();
 }
 
+/**
+ * Function: handleIntervalTimer
+ * -----------------------------
+ * Purpose:
+ *   Handles Interval Timer interrupts, which occur every 100ms and are used to
+ *   generate pseudo-clock ticks. The function:
+ *     - Acknowledges the interrupt by reloading the timer.
+ *     - Unblocks all processes waiting on the pseudo-clock semaphore.
+ *     - Resets the pseudo-clock semaphore.
+ *
+ * Parameters:
+ *   savedExcState - Pointer to the saved exception state at the time of the
+ *                   Interval Timer interrupt.
+ *
+ * Returns:
+ *   This function does not return normally; control is transferred via either
+ *   switchContext or scheduler.
+ */
 HIDDEN void handleIntervalTimer(state_t *savedExcState) {
   /* Acknowledge the interrupt by reloading the interval timer with 100ms */
   LDIT(SYSTEM_TICK_INTERVAL);
@@ -110,6 +179,26 @@ HIDDEN void handleIntervalTimer(state_t *savedExcState) {
   }
 }
 
+/**
+ * Function: interruptHandler
+ * --------------------------
+ * Purpose:
+ *   Serves as the main interrupt dispatcher. It examines the saved exception
+ *   state's Cause register to determine which interrupts are pending, then:
+ *     - Dispatches PLT interrupts if bit 1 is set.
+ *     - Dispatches Interval Timer interrupts if bit 2 is set.
+ *     - Iterates through interrupt lines 3-7 to process device interrupts.
+ *   After handling an interrupt, it transfers control either by switching
+ *   context or invoking the scheduler.
+ *
+ * Parameters:
+ *   savedExcState - Pointer to the saved exception state at the time of the
+ *                   interrupt.
+ *
+ * Returns:
+ *   This function should never return normally. If control reaches the end,
+ *   PANIC is invoked.
+ */
 void interruptHandler(state_t *savedExcState) {
   unsigned int pendingInterrupts = CAUSE_IP(savedExcState->s_cause);
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
