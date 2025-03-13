@@ -137,4 +137,19 @@
 /* Macro to read the TOD clock */
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
 
+/* Constants for VM management */
+#define UPROCMAX 8 /* Maximum number of concurrent user processes */
+#define SWAPPOOLSIZE (2 * UPROCMAX) /* Size of the Swap Pool */
+
+/*
+For a 32-bit EntryLo, the format is:
+Bits 31-12 (highest 20 bits): PFN
+Bit 11: N (Non-cacheable bit), unused
+Bit 10: D (Dirty bit)
+Bit 9: V (Valid bit)
+Bit 8: G (Global bit)
+Bits 7-0 (lowest 8 bits): Unused
+*/
+#define INTIAL_ENTRY_LO 0x00000200 /* Only need to set bit 10 (Dirty) to 1 (write-enabled) */
+
 #endif
