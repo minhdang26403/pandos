@@ -468,3 +468,30 @@ void generalExceptionHandler() {
     PANIC();
   }
 }
+
+void uTLB_RefillHandler() {
+  /* Get the state saved by the BIOS at the start of the BIOS Data Page */
+  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+  
+  /* Extract the VPN from the EntryHi of the saved state */
+  int vpn = savedExcState->s_entryHI & 0xFFFFF000; /* Keep only VPN bits */
+
+  /* Determine the page table index for the missing entry */
+  int pageIndex;
+  if (vpn == 0xBFFFF) {
+    pageIndex = 31;   /* Stack page */
+  } else if (vpn >= 0x80000 && vpn < (0x80000 + 31)) {
+    pageIndex = vpn - 0x80000;  /* Text & Data pages */
+  } else {
+    /* If the VPN is out of the expected range, panic */
+    PANIC();
+  }
+  
+  /* Write the TLB entry into the TLB */
+  setENTRYHI(currentProc->p_supportStruct->sup_pageTable[pageIndex].pte_entryHI);
+  setENTRYLO(currentProc->p_supportStruct->sup_pageTable[pageIndex].pte_entryLO);
+  TLBWR();
+  
+  /* Return control to the process to retry the instruction */
+  switchContext(savedExcState);
+}
