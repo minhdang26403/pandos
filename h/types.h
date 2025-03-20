@@ -115,18 +115,11 @@ typedef struct pte_t {
 } pte_t;
 
 typedef struct support_t {
-  int           sup_asid;               /* Process Id (asid)   */
-  state_t       sup_exceptState[2];     /* stored excpt states */
-  context_t     sup_exceptContext[2];   /* pass up contexts    */
-  pte_t         sup_pageTable[32];      /* Process Page Table (32 entries) */
+  int           sup_asid;                 /* Process Id (asid)   */
+  state_t       sup_exceptState[2];       /* stored excpt states */
+  context_t     sup_exceptContext[2];     /* pass up contexts    */
+  pte_t         sup_pageTable[MAXPAGES];  /* Process Page Table (32 entries) */
 } support_t;
-
-/* Swap Pool Entry structure */
-typedef struct swapPoolTableEntry {
-  int spte_asid;          /* ASID of the process that owns the page */
-  int spte_vpn;           /* Virtual page number of the page */
-  int spte_isOccupied;    /* Flag indicating if the frame is occupied */
-} swapPoolTableEntry;
 
 /* process control block type */
 typedef struct pcb_t {
