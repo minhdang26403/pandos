@@ -119,6 +119,27 @@
 #define STACKTOP        0x20001000  /* Nucleus stack size is one page (4KB) */
 #define DEVREG          0x10000054 /* All 40 device registers are located in low memory starting at 0x1000.0054 */
 
+/* Constants for VM management */
+#define MAXPAGES        32              /* 32 pages per U-proc */
+#define UPROCMAX        8               /* Maximum number of concurrent user processes */
+#define SWAP_POOL_SIZE  (2 * UPROCMAX)  /* Size of the Swap Pool */
+#define VPN_SHIFT       12              /* Shift for VPN (log2 PAGESIZE) */
+#define VPN_MASK        0xFFFFF000      /* Mask for VPN (bits 31-12) */
+#define VPN_TEXT_BASE   0x80000         /* Base VPN for .text/.data */
+#define VPN_STACK       0xBFFFF         /* VPN for stack page */
+#define TEXT_PAGE_COUNT 31              /* Number of .text/.data pages */
+
+/*
+For a 32-bit EntryLo, the format is:
+  - bits 31-12 (highest 20 bits): PFN
+  - bit 11: N (Non-cacheable bit), unused
+  - bit 10: D (Dirty bit)
+  - bit 9: V (Valid bit)
+  - bit 8: G (Global bit)
+  - bits 7-0 (lowest 8 bits): Unused
+*/
+#define PTE_DIRTY       (1U << 10)
+
 /* Exceptions related constants */
 #define	PGFAULTEXCEPT	  0
 #define GENERALEXCEPT	  1
@@ -136,20 +157,5 @@
 
 /* Macro to read the TOD clock */
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
-
-/* Constants for VM management */
-#define UPROCMAX 8 /* Maximum number of concurrent user processes */
-#define SWAPPOOLSIZE (2 * UPROCMAX) /* Size of the Swap Pool */
-
-/*
-For a 32-bit EntryLo, the format is:
-Bits 31-12 (highest 20 bits): PFN
-Bit 11: N (Non-cacheable bit), unused
-Bit 10: D (Dirty bit)
-Bit 9: V (Valid bit)
-Bit 8: G (Global bit)
-Bits 7-0 (lowest 8 bits): Unused
-*/
-#define INTIAL_ENTRY_LO 0x00000200 /* Only need to set bit 10 (Dirty) to 1 (write-enabled) */
 
 #endif

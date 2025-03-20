@@ -14,5 +14,6 @@
 
 extern void copyState(state_t *dest, state_t *src);
 extern void generalExceptionHandler();
+extern void uTLB_RefillHandler();
 
 #endif

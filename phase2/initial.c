@@ -30,12 +30,6 @@
 /* Test function of phase 2 */
 extern void test();
 
-/*
- * The definition of this function is given in p2test.c. This function will be
- * implemented in exceptions.c when the Support Level is implemented.
- */
-extern void uTLB_RefillHandler();
-
 /* 1. Define Nucleus's global variables */
 int procCnt;      /* The number of started, but not yet terminated processes */
 int softBlockCnt; /* The number of started, but not terminated processes that

@@ -1,14 +1,15 @@
 /************************** EXCEPTIONS.C ******************************
  *
  * The Exception Handling Module.
- * 
+ *
  * Description:
- *   This module implements the Exception Handling routines for Phase 2.
- *   It handles system call exceptions, program trap exceptions, TLB exceptions,
- *   and device interrupts. The module defines handlers for various system call
- *   services (SYS1 through SYS8), as well as helper functions for process termination,
- *   state copying, process blocking on a semaphore, and exception pass-up.
- * 
+ *   This module implements the Exception Handling routines for Phase 2. It
+ * handles system call exceptions, program trap exceptions, TLB exceptions, and
+ * device interrupts. The module defines handlers for various system call
+ * services (SYS1 through SYS8), as well as helper functions for process
+ * termination, state copying, process blocking on a semaphore, and exception
+ * pass-up.
+ *
  * Written by Dang Truong, Loc Pham
  */
 
@@ -56,17 +57,18 @@ void copyState(state_t *dest, state_t *src) {
  * -------------------------
  * Purpose:
  *   Implements the SYS1 service to create a new process. This function
- *   allocates a new PCB, initializes its processor state using the state
- *   provided in savedExcState->s_a1, sets its support structure pointer from
- *   savedExcState->s_a2, and inserts the new process into the ready queue.
- *   It returns 0 in s_v0 upon success or -1 if no PCB is available.
+ * allocates a new PCB, initializes its processor state using the state provided
+ * in savedExcState->s_a1, sets its support structure pointer from
+ * savedExcState->s_a2, and inserts the new process into the ready queue. It
+ * returns 0 in s_v0 upon success or -1 if no PCB is available.
  *
  * Parameters:
- *   savedExcState - Pointer to the saved exception state of the calling process.
+ *   savedExcState - Pointer to the saved exception state of the calling
+ * process.
  *
  * Returns:
  *   This function does not return normally; it calls switchContext to transfer
- *   control.
+ * control.
  */
 HIDDEN void sysCreateProc(state_t *savedExcState) {
   pcb_PTR p = allocPcb();
@@ -84,7 +86,7 @@ HIDDEN void sysCreateProc(state_t *savedExcState) {
     p->p_time = 0;
     p->p_semAdd = NULL;
     p->p_supportStruct = supportp;
-    
+
     /* Make this process alive */
     insertProcQ(&readyQueue, p);
     insertChild(currentProc, p);
@@ -99,10 +101,10 @@ HIDDEN void sysCreateProc(state_t *savedExcState) {
  * Function: terminateProcHelper
  * -----------------------------
  * Purpose:
- *   Recursively terminates the process tree rooted at the given PCB.
- *   It removes each process from its parent's child list, the ready queue,
- *   or the blocked list, adjusts semaphore counts as needed, frees the PCB,
- *   and decrements the process count.
+ *   Recursively terminates the process tree rooted at the given PCB. It removes
+ * each process from its parent's child list, the ready queue, or the blocked
+ * list, adjusts semaphore counts as needed, frees the PCB, and decrements the
+ * process count.
  *
  * Parameters:
  *   p - Pointer to the PCB of the process to terminate.
@@ -150,15 +152,17 @@ HIDDEN void terminateProcHelper(pcb_PTR p) {
  * Function: sysTerminateProc
  * --------------------------
  * Purpose:
- *   Implements the SYS2 service to terminate the current process and all
- *   its progeny. It calls terminateProcHelper on the current process and
- *   then invokes the scheduler to dispatch the next process.
+ *   Implements the SYS2 service to terminate the current process and all its
+ * progeny. It calls terminateProcHelper on the current process and then invokes
+ * the scheduler to dispatch the next process.
  *
  * Parameters:
- *   savedExcState - Pointer to the saved exception state of the calling process.
+ *   savedExcState - Pointer to the saved exception state of the calling
+ * process.
  *
  * Returns:
- *   This function does not return normally; control is transferred via scheduler.
+ *   This function does not return normally; control is transferred via
+ * scheduler.
  */
 HIDDEN void sysTerminateProc(state_t *savedExcState) {
   terminateProcHelper(currentProc);
@@ -172,15 +176,17 @@ HIDDEN void sysTerminateProc(state_t *savedExcState) {
  * -------------------
  * Purpose:
  *   Helper function to block the current process on a semaphore. It saves the
- *   current process's state, updates its accumulated CPU time, puts it into
- *   the blocked list for the semaphore, and then calls the scheduler.
+ * current process's state, updates its accumulated CPU time, puts it into the
+ * blocked list for the semaphore, and then calls the scheduler.
  *
  * Parameters:
  *   sem           - Pointer to the semaphore on which the process will wait.
- *   savedExcState - Pointer to the saved exception state of the calling process.
+ *   savedExcState - Pointer to the saved exception state of the calling
+ * process.
  *
  * Returns:
- *   This function does not return normally; control is transferred via scheduler.
+ *   This function does not return normally; control is transferred via
+ * scheduler.
  */
 HIDDEN void waitOnSem(int *sem, state_t *savedExcState) {
   /* Save the exception state */
@@ -200,14 +206,16 @@ HIDDEN void waitOnSem(int *sem, state_t *savedExcState) {
  * ---------------------
  * Purpose:
  *   Implements the SYS3 service (Passeren/P operation) by decrementing the
- *   semaphore specified in savedExcState->s_a1. If the semaphore value becomes
- *   negative, the current process is blocked on the semaphore.
+ * semaphore specified in savedExcState->s_a1. If the semaphore value becomes
+ * negative, the current process is blocked on the semaphore.
  *
  * Parameters:
- *   savedExcState - Pointer to the saved exception state of the calling process.
+ *   savedExcState - Pointer to the saved exception state of the calling
+ * process.
  *
  * Returns:
- *   This function does not return normally; it transfers control via switchContext.
+ *   This function does not return normally; it transfers control via
+ * switchContext.
  */
 HIDDEN void sysPasseren(state_t *savedExcState) {
   int *sem = (int *)savedExcState->s_a1;
@@ -224,14 +232,17 @@ HIDDEN void sysPasseren(state_t *savedExcState) {
  * ---------------------
  * Purpose:
  *   Implements the SYS4 service (Verhogen/V operation) by incrementing the
- *   semaphore specified in savedExcState->s_a1. If the semaphore value is less
- *   than or equal to zero, a blocked process is unblocked and moved to the ready queue.
+ * semaphore specified in savedExcState->s_a1. If the semaphore value is less
+ * than or equal to zero, a blocked process is unblocked and moved to the ready
+ * queue.
  *
  * Parameters:
- *   savedExcState - Pointer to the saved exception state of the calling process.
+ *   savedExcState - Pointer to the saved exception state of the calling
+ * process.
  *
  * Returns:
- *   This function does not return normally; it transfers control via switchContext.
+ *   This function does not return normally; it transfers control via
+ * switchContext.
  */
 HIDDEN void sysVerhogen(state_t *savedExcState) {
   int *sem = (int *)savedExcState->s_a1;
@@ -252,13 +263,14 @@ HIDDEN void sysVerhogen(state_t *savedExcState) {
  * -------------------
  * Purpose:
  *   Implements the SYS5 service to wait for an I/O device. It calculates the
- *   appropriate semaphore index based on the interrupt line number, device number,
- *   and whether the operation is a terminal read or write. The function then
- *   decrements the device semaphore, increments the soft-block count, and blocks
- *   the current process.
+ * appropriate semaphore index based on the interrupt line number, device
+ * number, and whether the operation is a terminal read or write. The function
+ * then decrements the device semaphore, increments the soft-block count, and
+ * blocks the current process.
  *
  * Parameters:
- *   savedExcState - Pointer to the saved exception state of the calling process.
+ *   savedExcState - Pointer to the saved exception state of the calling
+ * process.
  *
  * Returns:
  *   This function does not return normally; it transfers control via waitOnSem.
@@ -286,14 +298,17 @@ HIDDEN void sysWaitIO(state_t *savedExcState) {
  * -----------------------
  * Purpose:
  *   Implements the SYS6 service to obtain the total CPU time consumed by the
- *   current process. The function adds the accumulated CPU time (p_time) with the
- *   elapsed time in the current quantum and returns the result in savedExcState->s_v0.
+ * current process. The function adds the accumulated CPU time (p_time) with the
+ * elapsed time in the current quantum and returns the result in
+ * savedExcState->s_v0.
  *
  * Parameters:
- *   savedExcState - Pointer to the saved exception state of the calling process.
+ *   savedExcState - Pointer to the saved exception state of the calling
+ * process.
  *
  * Returns:
- *   This function does not return normally; it transfers control via switchContext.
+ *   This function does not return normally; it transfers control via
+ * switchContext.
  */
 HIDDEN void sysGetCPUTime(state_t *savedExcState) {
   cpu_t now;
@@ -308,11 +323,12 @@ HIDDEN void sysGetCPUTime(state_t *savedExcState) {
  * -------------------------
  * Purpose:
  *   Implements the SYS7 service to wait for the pseudo-clock. It decrements the
- *   pseudo-clock semaphore, increments the soft-block count, and blocks the current
- *   process.
+ * pseudo-clock semaphore, increments the soft-block count, and blocks the
+ * current process.
  *
  * Parameters:
- *   savedExcState - Pointer to the saved exception state of the calling process.
+ *   savedExcState - Pointer to the saved exception state of the calling
+ * process.
  *
  * Returns:
  *   This function does not return normally; it transfers control via waitOnSem.
@@ -329,13 +345,15 @@ HIDDEN void sysWaitForClock(state_t *savedExcState) {
  * ---------------------------
  * Purpose:
  *   Implements the SYS8 service to retrieve the support structure pointer of
- *   the current process. The pointer is returned in savedExcState->s_v0.
+ * the current process. The pointer is returned in savedExcState->s_v0.
  *
  * Parameters:
- *   savedExcState - Pointer to the saved exception state of the calling process.
+ *   savedExcState - Pointer to the saved exception state of the calling
+ * process.
  *
  * Returns:
- *   This function does not return normally; it transfers control via switchContext.
+ *   This function does not return normally; it transfers control via
+ * switchContext.
  */
 HIDDEN void sysGetSupportData(state_t *savedExcState) {
   savedExcState->s_v0 = (int)currentProc->p_supportStruct;
@@ -347,17 +365,17 @@ HIDDEN void sysGetSupportData(state_t *savedExcState) {
  * ---------------------
  * Purpose:
  *   Determines whether an exception should be passed up to the Support Level or
- *   cause the current process to terminate. If the current process has a non-NULL
- *   support structure, its saved exception state is copied into that structure and
- *   a new context is loaded. Otherwise, the process is terminated.
+ * cause the current process to terminate. If the current process has a non-NULL
+ * support structure, its saved exception state is copied into that structure
+ * and a new context is loaded. Otherwise, the process is terminated.
  *
  * Parameters:
  *   savedExcState - Pointer to the saved exception state.
  *   exceptType    - Exception type indicator (PGFAULTEXCEPT or GENERALEXCEPT).
  *
  * Returns:
- *   This function does not return normally; control is transferred via loadContext
- *   or sysTerminateProc.
+ *   This function does not return normally; control is transferred via
+ * loadContext or sysTerminateProc.
  */
 HIDDEN void passUpOrDie(state_t *savedExcState, int exceptType) {
   support_t *supportStruct = currentProc->p_supportStruct;
@@ -374,7 +392,7 @@ HIDDEN void passUpOrDie(state_t *savedExcState, int exceptType) {
 /* Define the function pointer type for syscalls */
 typedef void (*syscall_t)(state_t *);
 
-/* 
+/*
  * The syscall table maps syscall numbers (1-8) to the corresponding service
  * handler functions.
  */
@@ -395,16 +413,17 @@ HIDDEN syscall_t syscalls[] = {
  * ------------------------
  * Purpose:
  *   Dispatches the system call based on the syscall number contained in
- *   savedExcState->s_a0. If the syscall is invoked in user mode, it simulates a
- *   program trap. Otherwise, it adjusts the program counter and invokes the
- *   appropriate syscall service.
+ * savedExcState->s_a0. If the syscall is invoked in user mode, it simulates a
+ * program trap. Otherwise, it adjusts the program counter and invokes the
+ * appropriate syscall service.
  *
  * Parameters:
- *   savedExcState - Pointer to the saved exception state of the calling process.
+ *   savedExcState - Pointer to the saved exception state of the calling
+ * process.
  *
  * Returns:
- *   This function does not return normally; control is transferred via the invoked
- *   syscall handler.
+ *   This function does not return normally; control is transferred via the
+ * invoked syscall handler.
  */
 HIDDEN void syscallHandler(state_t *savedExcState) {
   int num = savedExcState->s_a0;
@@ -417,9 +436,9 @@ HIDDEN void syscallHandler(state_t *savedExcState) {
       passUpOrDie(savedExcState, GENERALEXCEPT);
     } else {
       /* If previous mode was kernel mode (KUP = 0), handle the syscall */
-      
-      savedExcState->s_pc += 4;     /* control of the current process should be
-                                       returned to the next instruction */
+
+      savedExcState->s_pc += 4; /* control of the current process should be
+                                   returned to the next instruction */
       syscalls[num](savedExcState);
     }
   } else {
@@ -432,7 +451,7 @@ HIDDEN void syscallHandler(state_t *savedExcState) {
  * ---------------------------------
  * Purpose:
  *   Serves as the main exception handler. It reads the exception code from the
- *   saved exception state and dispatches control to the appropriate handler:
+ * saved exception state and dispatches control to the appropriate handler:
  *     - Interrupts are forwarded to interruptHandler.
  *     - TLB exceptions are passed up using the PGFAULTEXCEPT index.
  *     - Program trap exceptions are passed up using the GENERALEXCEPT index.
@@ -443,8 +462,8 @@ HIDDEN void syscallHandler(state_t *savedExcState) {
  *   None.
  *
  * Returns:
- *   This function does not return normally; control is transferred via the 
- *   appropriate exception handling mechanism.
+ *   This function does not return normally; control is transferred via the
+ * appropriate exception handling mechanism.
  */
 void generalExceptionHandler() {
   state_t *savedExcState = (state_t *)BIOSDATAPAGE;
@@ -469,29 +488,39 @@ void generalExceptionHandler() {
   }
 }
 
+/* TLB-Refill handler: Level 3, kernel-mode, interrupts disabled */
 void uTLB_RefillHandler() {
-  /* Get the state saved by the BIOS at the start of the BIOS Data Page */
+  /* Get saved exception state from BIOS Data Page */
   state_t *savedExcState = (state_t *)BIOSDATAPAGE;
-  
-  /* Extract the VPN from the EntryHi of the saved state */
-  int vpn = savedExcState->s_entryHI & 0xFFFFF000; /* Keep only VPN bits */
+
+  /* Extract VPN: mask then shift */
+  unsigned int entryHI = savedExcState->s_entryHI;
+  unsigned int vpn = (entryHI & VPN_MASK) >> VPN_SHIFT;
 
   /* Determine the page table index for the missing entry */
-  int pageIndex;
-  if (vpn == 0xBFFFF) {
-    pageIndex = 31;   /* Stack page */
-  } else if (vpn >= 0x80000 && vpn < (0x80000 + 31)) {
-    pageIndex = vpn - 0x80000;  /* Text & Data pages */
+  unsigned int pageIdx;
+  if (vpn == VPN_STACK) {
+    pageIdx = MAXPAGES - 1; /* Stack page (31) */
+  } else if (vpn >= VPN_TEXT_BASE && vpn < VPN_TEXT_BASE + TEXT_PAGE_COUNT) {
+    pageIdx = vpn - VPN_TEXT_BASE; /* .text/.data pages (0-30) */
   } else {
     /* If the VPN is out of the expected range, panic */
     PANIC();
   }
-  
-  /* Write the TLB entry into the TLB */
-  setENTRYHI(currentProc->p_supportStruct->sup_pageTable[pageIndex].pte_entryHI);
-  setENTRYLO(currentProc->p_supportStruct->sup_pageTable[pageIndex].pte_entryLO);
+
+  /* Get Page Table entry */
+  support_t *sup = currentProc->p_supportStruct;
+  if (sup == NULL) {
+    /* Consistent with Phase 2 behavior (pass up or die) */
+    sysTerminateProc(currentProc);
+  }
+  pte_t *pte = &sup->sup_pageTable[pageIdx];
+
+  /* Write to TLB */
+  setENTRYHI(pte->pte_entryHI);
+  setENTRYLO(pte->pte_entryLO);
   TLBWR();
-  
+
   /* Return control to the process to retry the instruction */
   switchContext(savedExcState);
 }
