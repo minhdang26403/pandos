@@ -9,6 +9,8 @@
  *  Written by Dang Truong
  */
 
-extern void initSwapStructs();
+void initSwapStructs();
+void pager();
+
 
 #endif

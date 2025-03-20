@@ -26,7 +26,7 @@ void initPageTable(support_t *supportStruct, int asid) {
   supportStruct->sup_asid = asid;
 
   /* Initialize the first 31 entries (text and data pages) */
-  for (i = 0; i < 31; i++) {
+  for (i = 0; i < MAXPAGES - 1; i++) {
     /*
     For a 32-bit EntryHi, the format is:
     Bits 31-12 (highest 20 bits): VPN
@@ -34,12 +34,12 @@ void initPageTable(support_t *supportStruct, int asid) {
     Bits 5-0 (lowest 6 bits): Unused
     */
     supportStruct->sup_pageTable[i].pte_entryHI =
-        ZERO_MASK | ((0x80000 + i) << 12) | (asid << 6);
+        ZERO_MASK | ((VPN_TEXT_BASE + i) << VPN_SHIFT) | (asid << ASID_SHIFT);
     supportStruct->sup_pageTable[i].pte_entryLO = ZERO_MASK | PTE_DIRTY;
   }
 
   /* Initialize the stack page (entry 31) */
-  supportStruct->sup_pageTable[31].pte_entryHI =
-      ZERO_MASK | (0xBFFFF << 12) | (asid << 6);
-  supportStruct->sup_pageTable[31].pte_entryLO = ZERO_MASK | PTE_DIRTY;
+  supportStruct->sup_pageTable[MAXPAGES - 1].pte_entryHI =
+      ZERO_MASK | (VPN_STACK << VPN_SHIFT) | (asid << ASID_SHIFT);
+  supportStruct->sup_pageTable[MAXPAGES - 1].pte_entryLO = ZERO_MASK | PTE_DIRTY;
 }

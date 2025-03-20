@@ -3,8 +3,8 @@
  * The Nucleus Initialization Module.
  *
  * Description:
- *   This module implements the Nucleus Initialization routines for Phase 2. It sets up
- *   the environment needed formultiprogramming by:
+ *   This module implements the Nucleus Initialization routines for Phase 2. It
+ * sets up the environment needed formultiprogramming by:
  *     - Defining relevant global variables for Nucleus (procCnt, softBlockCnt,
  *       readyQueue, currentProc, deviceSem).
  *     - Populating the Processor 0 Pass Up Vector with the appropriate handler
@@ -108,6 +108,12 @@ void main() {
   /* Set SP to RAMTOP */
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   p->p_s.s_sp = RAMSTART + busRegArea->ramsize;
+
+  /* TODO: do we need this? */
+  if (busRegArea->ramsize <
+      SWAP_POOL_BASE - RAMSTART + SWAP_POOL_SIZE * PAGESIZE + PAGESIZE) {
+    PANIC(); /* Insufficient RAM */
+  }
 
   /* Set PC to jump to the test function of p2test.c */
   p->p_s.s_pc = (memaddr)test;

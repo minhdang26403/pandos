@@ -42,6 +42,9 @@
 #define CAUSE_EXCCODE(cause) (((cause) >> 2) & 0x1F)  /* Extract ExcCode (bits 2-6) */ 
 #define CAUSE_IP(cause) ((cause) & 0xFF00) /* Extract pending interrupt bits (bits 8-15) */
 
+/* Cause register Status Codes */
+#define EXC_TLBMOD    1
+
 /* timer, timescale, TOD-LO and other bus regs */
 #define RAMBASEADDR		0x10000000
 #define RAMBASESIZE		0x10000004
@@ -108,6 +111,10 @@
 #define RESET			    0
 #define ACK				    1
 
+/* flash device command codes */
+#define READBLK       2
+#define WRITEBLK      3
+
 /* Memory related constants */
 #define KSEG0           0x00000000
 #define KSEG1           0x20000000
@@ -120,14 +127,23 @@
 #define DEVREG          0x10000054 /* All 40 device registers are located in low memory starting at 0x1000.0054 */
 
 /* Constants for VM management */
-#define MAXPAGES        32              /* 32 pages per U-proc */
-#define UPROCMAX        8               /* Maximum number of concurrent user processes */
-#define SWAP_POOL_SIZE  (2 * UPROCMAX)  /* Size of the Swap Pool */
-#define VPN_SHIFT       12              /* Shift for VPN (log2 PAGESIZE) */
-#define VPN_MASK        0xFFFFF000      /* Mask for VPN (bits 31-12) */
-#define VPN_TEXT_BASE   0x80000         /* Base VPN for .text/.data */
-#define VPN_STACK       0xBFFFF         /* VPN for stack page */
-#define TEXT_PAGE_COUNT 31              /* Number of .text/.data pages */
+#define MAXPAGES        32                          /* 32 pages per U-proc */
+#define UPROCMAX        8                           /* Maximum number of concurrent user processes */
+
+#define SWAP_POOL_SIZE  (2 * UPROCMAX)              /* Size of the Swap Pool */
+#define SWAP_POOL_BASE  (RAMSTART + 32 * PAGESIZE)  /* Starting address of the Swap Pool */
+
+#define ASID_UNOCCUPIED -1                          /* Marker for free Swap Pool frame */
+#define ASID_SHIFT      6
+#define ASID_MASK       6
+
+#define VPN_SHIFT       12                          /* Shift for VPN (log2 PAGESIZE) */
+#define VPN_MASK        0xFFFFF000                  /* Mask for VPN (bits 31-12) */
+#define PFN_MASK        0xFFFFF000                  /* Mask for PFN (bits 31-12) */
+
+#define VPN_TEXT_BASE   0x80000                     /* Base VPN for .text/.data */
+#define VPN_STACK       0xBFFFF                     /* VPN for stack page */
+#define TEXT_PAGE_COUNT 31                          /* Number of .text/.data pages */
 
 /*
 For a 32-bit EntryLo, the format is:
@@ -138,7 +154,11 @@ For a 32-bit EntryLo, the format is:
   - bit 8: G (Global bit)
   - bits 7-0 (lowest 8 bits): Unused
 */
+#define PTE_VALID       (1U << 9)
 #define PTE_DIRTY       (1U << 10)
+
+/* Constants to manipulate TLB-related CP0 control registers */
+#define TLB_PRESENT     (1U << 31)
 
 /* Exceptions related constants */
 #define	PGFAULTEXCEPT	  0
@@ -157,5 +177,15 @@ For a 32-bit EntryLo, the format is:
 
 /* Macro to read the TOD clock */
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
+
+/* system call codes */
+#define	CREATEPROCESS	    1	  /* create process */
+#define	TERMINATEPROCESS	2	  /* terminate process */
+#define	PASSEREN			    3	  /* P a semaphore */
+#define	VERHOGEN		      4	  /* V a semaphore */
+#define	WAITIO			      5	  /* delay on a io semaphore */
+#define	GETCPUTIME		    6	  /* get cpu time used to date */
+#define	WAITCLOCK		      7	  /* delay on the clock semaphore */
+#define	GETSUPPORTPTR     8	  /* return support structure ptr. */
 
 #endif
