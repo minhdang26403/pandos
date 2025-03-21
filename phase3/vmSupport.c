@@ -14,6 +14,7 @@
 
 #include "../h/const.h"
 #include "../h/exceptions.h"
+#include "../h/initProc.h"
 #include "../h/initial.h"
 #include "../h/scheduler.h"
 #include "../h/sysSupport.h"
@@ -30,7 +31,7 @@ typedef struct spte_t {
 /* Module-wide variables */
 static memaddr swapPool; /* RAM frames set aside to support virtual memory */
 static spte_t swapPoolTable[SWAP_POOL_SIZE]; /* Swap Pool table */
-static int swapPoolSem;                             /* Swap Pool semaphore: mutex */
+static int swapPoolSem;                      /* Swap Pool semaphore: mutex */
 static int nextFrameIdx = 0; /* FIFO index for page replacement (4.5.4) */
 
 /*
@@ -62,7 +63,7 @@ static int readFlashPage(int asid, int blockNum, memaddr dest) {
   device_t *flash = &busRegArea->devreg[devIdx];
 
   /* 1. Lock device register */
-  SYSCALL(PASSEREN, (int)&deviceSem[devNum], 0, 0);
+  SYSCALL(PASSEREN, (int)&supportDeviceSem[devNum], 0, 0);
 
   /* 2. Set DMA address */
   flash->d_data0 = dest;
@@ -76,12 +77,12 @@ static int readFlashPage(int asid, int blockNum, memaddr dest) {
   /* TODO: do we need to mask status with `FLASH_STATUS_MASK` as for terminal
    * devices? */
   if (status != READY) {
-    SYSCALL(VERHOGEN, (int)&deviceSem[devNum], 0, 0);
+    SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
     return -1; /* Error */
   }
 
   /* 5. Unlock device register */
-  SYSCALL(VERHOGEN, (int)&deviceSem[devNum], 0, 0);
+  SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
   return 0;
 }
 
@@ -94,7 +95,7 @@ static int writeFlashPage(int asid, int blockNum, memaddr src) {
   device_t *flash = &busRegArea->devreg[devIdx];
 
   /* 1. Lock device register */
-  SYSCALL(PASSEREN, (int)&deviceSem[devNum], 0, 0);
+  SYSCALL(PASSEREN, (int)&supportDeviceSem[devNum], 0, 0);
 
   /* 2. Set DMA address */
   flash->d_data0 = src;
@@ -108,12 +109,12 @@ static int writeFlashPage(int asid, int blockNum, memaddr src) {
   /* TODO: do we need to mask status with `FLASH_STATUS_MASK` as for terminal
    * devices? */
   if (status != READY) {
-    SYSCALL(VERHOGEN, (int)&deviceSem[devNum], 0, 0);
+    SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
     return -1; /* Error */
   }
 
   /* 5. Unlock device register */
-  SYSCALL(VERHOGEN, (int)&deviceSem[devNum], 0, 0);
+  SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
   return 0;
 }
 
@@ -194,10 +195,10 @@ void pager() {
   /* 10. Update Swap Pool table */
   swapPoolTable[frameIdx].spte_asid = sup->sup_asid;
   swapPoolTable[frameIdx].spte_vpn = vpn;
-  swapPoolTable[frameIdx].spte_pte = &sup->sup_pageTable[pageIdx];
+  swapPoolTable[frameIdx].spte_pte = &sup->sup_privatePgTbl[pageIdx];
 
   /* 11. Update Page Table (PFN and V=1) */
-  pte_t *pte = &sup->sup_pageTable[pageIdx];
+  pte_t *pte = &sup->sup_privatePgTbl[pageIdx];
   unsigned int status = getSTATUS();
   setSTATUS(status & ~STATUS_IEC); /* Disable interrupts */
   pte->pte_entryLO = (frameAddr & PFN_MASK) | PTE_DIRTY | PTE_VALID;

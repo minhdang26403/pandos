@@ -13,6 +13,7 @@
 #include "../h/sysSupport.h"
 
 #include "../h/const.h"
+#include "../h/initProc.h"
 #include "../h/initial.h"
 #include "../h/types.h"
 #include "../h/vmSupport.h"
@@ -65,17 +66,24 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
     programTrapHandler();
   }
 
-  SYSCALL(PASSEREN, (int)&deviceSem[devIdx], 0, 0);
+  SYSCALL(PASSEREN, (int)&supportDeviceSem[devIdx], 0, 0);
 
   /* Send each character up to len */
   char *s = (char *)virtAddr;
   int status = READY; /* Default for len = 0 */
   int i;
   for (i = 0; i < len; i++) {
-    printer->d_data0 = s[i]; /* Low byte gets char */
-    printer->d_command = PRINTCHR;
+    /* Prepare data */
+    printer->d_data0 = s[i];
 
+    /* Disable interrupts to ensure writing the COMMAND field and executing SYS5
+     * (WAITIO) happens atomically */
+    unsigned int status = getSTATUS();
+    setSTATUS(status & ~STATUS_IEC);
+    printer->d_command = PRINTCHR;
     status = SYSCALL(WAITIO, PRNTINT, devNum, 0);
+    setSTATUS(status); /* Reenable interrupts */
+
     if (status != READY) {
       break;
     }
@@ -89,7 +97,7 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
     excState->s_v0 = -status;
   }
 
-  SYSCALL(VERHOGEN, (int)&deviceSem[devIdx], 0, 0);
+  SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
   switchContext(excState);
 }
 
@@ -107,15 +115,21 @@ HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
     programTrapHandler();
   }
 
-  SYSCALL(PASSEREN, (int)&deviceSem[devIdx], 0, 0);
+  SYSCALL(PASSEREN, (int)&supportDeviceSem[devIdx], 0, 0);
 
   /* Send each character up to len */
   char *s = (char *)virtAddr;
   int status = CHAR_TRANSMITTED; /* Default for len = 0 */
   int i;
   for (i = 0; i < len; i++) {
+    /* Disable interrupts to ensure writing the COMMAND field and executing SYS5
+     * (WAITIO) happens atomically */
+    unsigned int status = getSTATUS();
+    setSTATUS(status & ~STATUS_IEC);
     terminal->t_transm_command = TRANSMITCHAR | (s[i] << BYTELEN);
     status = SYSCALL(WAITIO, TERMINT, devNum, FALSE);
+    setSTATUS(status); /* Reenable interrupts */
+
     if ((status & TERMINT_STATUS_MASK) != CHAR_TRANSMITTED) {
       break;
     }
@@ -129,7 +143,7 @@ HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
     excState->s_v0 = -status;
   }
 
-  SYSCALL(VERHOGEN, (int)&deviceSem[devIdx], 0, 0);
+  SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
   switchContext(excState);
 }
 
@@ -140,20 +154,26 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *terminal = &busRegArea->devreg[devIdx];
 
-  SYSCALL(PASSEREN, (int)&deviceSem[devIdx], 0, 0);
+  SYSCALL(PASSEREN, (int)&supportDeviceSem[devIdx], 0, 0);
 
   /* Read each character up to len */
   char *buffer = (char *)virtAddr;
   int status;
 
   while (TRUE) {
+    /* Disable interrupts to ensure writing the COMMAND field and executing SYS5
+     * (WAITIO) happens atomically */
+    unsigned int status = getSTATUS();
+    setSTATUS(status & ~STATUS_IEC);
     terminal->t_recv_command = RECEIVECHAR;
     status = SYSCALL(WAITIO, TERMINT, devNum, TRUE);
+    setSTATUS(status); /* Reenable interrupts */
+
     if ((status & TERMINT_STATUS_MASK) == CHAR_RECEIVED) {
       char c = (status >> BYTELEN) & TERMINT_STATUS_MASK;
       /* Validate each buffer address before writing */
       if (!isValidAddr(sup, (memaddr)buffer)) {
-        SYSCALL(VERHOGEN, (int)&deviceSem[devIdx], 0, 0);
+        SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
         programTrapHandler(); /* Buffer overflow */
       }
       *buffer = c;
@@ -174,7 +194,7 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
     excState->s_v0 = -status;
   }
 
-  SYSCALL(VERHOGEN, (int)&deviceSem[devIdx], 0, 0);
+  SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
   switchContext(excState);
 }
 
@@ -211,6 +231,4 @@ HIDDEN void syscallHandler(support_t *sup) {
 }
 
 /* Program Trap Exception Handler */
-void programTrapHandler() {
-  sysTerminate();
-}
+void programTrapHandler() { sysTerminate(); }

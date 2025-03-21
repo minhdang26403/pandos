@@ -78,8 +78,8 @@
 #define DEVREGLEN		  4		  /* device register field length in bytes, and regs per dev */	
 #define DEVREGSIZE	  16 		/* device register size in bytes */
 
-/* uMPS3 supports five different classes of peripheral devices (disk, flash,
- * (network card, printer and terminal) and up to eight instances of each type.
+/* uMPS3 supports five different classes of peripheral devices (disk, flash, 
+ * network card, printer and terminal) and up to eight instances of each type.
  * Each terminal device consists of two independent sub-devices (one for receiving
  * and one for transmitting), meaning we need to double the count for terminals:
  *    NUMDEVICES = (4 x 8) + (8 x 2) = 48
@@ -141,15 +141,17 @@
 
 /* Constants for VM management */
 #define MAXPAGES        32                          /* 32 pages per U-proc */
-#define UPROCMAX        8                           /* Maximum number of concurrent user processes */
 #define STACKPAGE      (MAXPAGES - 1)               /* Page 31 for stack */
+#define MAX_UPROCS      8                           /* Maximum number of concurrent user processes */
+#define UPROC_PC        0x800000B0                  /* .text start */
+#define UPROC_SP        0xC0000000                  /* RAM top */
 
-#define SWAP_POOL_SIZE  (2 * UPROCMAX)              /* Size of the Swap Pool */
+#define SWAP_POOL_SIZE  (2 * MAX_UPROCS)              /* Size of the Swap Pool */
 #define SWAP_POOL_BASE  (RAMSTART + 32 * PAGESIZE)  /* Starting address of the Swap Pool */
 
 #define ASID_UNOCCUPIED -1                          /* Marker for free Swap Pool frame */
 #define ASID_SHIFT      6
-#define ASID_MASK       6
+#define ASID_MASK       0xFC0
 
 #define VPN_SHIFT       12                          /* Shift for VPN (log2 PAGESIZE) */
 #define VPN_MASK        0xFFFFF000                  /* Mask for VPN (bits 31-12) */

@@ -514,7 +514,7 @@ void uTLB_RefillHandler() {
     /* Consistent with Phase 2 behavior (pass up or die) */
     sysTerminateProc(currentProc);
   }
-  pte_t *pte = &sup->sup_pageTable[pageIdx];
+  pte_t *pte = &sup->sup_privatePgTbl[pageIdx];
 
   /* Write to TLB */
   setENTRYHI(pte->pte_entryHI);

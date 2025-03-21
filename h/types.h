@@ -115,10 +115,14 @@ typedef struct pte_t {
 } pte_t;
 
 typedef struct support_t {
-  int           sup_asid;                 /* Process Id (asid)   */
-  state_t       sup_exceptState[2];       /* stored excpt states */
-  context_t     sup_exceptContext[2];     /* pass up contexts    */
-  pte_t         sup_pageTable[MAXPAGES];  /* Process Page Table (32 entries) */
+  int           sup_asid;                   /* Process Id (asid) */
+  state_t       sup_exceptState[2];         /* stored excpt states */
+  context_t     sup_exceptContext[2];       /* pass up contexts */
+  pte_t         sup_privatePgTbl[MAXPAGES]; /* Process Page Table (32 entries) */
+  int           sup_stackTLB[500];          /* The stack area for the process's TLB 
+                                                exception handler (2Kb) */
+  int           sup_stackGen[500];          /* The stack area for the process's 
+                                                Support Level general exception handler */
 } support_t;
 
 /* process control block type */

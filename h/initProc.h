@@ -11,4 +11,6 @@
 #include "../h/const.h"
 #include "../h/types.h"
 
+extern int supportDeviceSem[NUMDEVICES];
+
 #endif
