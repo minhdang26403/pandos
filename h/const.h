@@ -44,6 +44,7 @@
 
 /* Cause register Status Codes */
 #define EXC_TLBMOD    1
+#define EXC_SYSCALL   8
 
 /* timer, timescale, TOD-LO and other bus regs */
 #define RAMBASEADDR		0x10000000

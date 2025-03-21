@@ -8,4 +8,7 @@
  *  Written by Dang Truong
  */
 
+
+void supportExceptionHandler();
+
 #endif

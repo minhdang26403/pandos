@@ -15,6 +15,7 @@
 #include "../h/const.h"
 #include "../h/exceptions.h"
 #include "../h/scheduler.h"
+#include "../h/sysSupport.h"
 #include "../h/types.h"
 #include "umps3/umps/libumps.h"
 
@@ -28,7 +29,7 @@ typedef struct spte_t {
 /* Module-wide variables */
 static memaddr swapPool; /* RAM frames set aside to support virtual memory */
 static spte_t swapPoolTable[SWAP_POOL_SIZE]; /* Swap Pool table */
-static int swapPoolSem;                      /* Swap Pool semaphore: mutex */
+int swapPoolSem;                             /* Swap Pool semaphore: mutex */
 static int flashSem[UPROCMAX] = {1, 1, 1, 1,
                                  1, 1, 1, 1}; /* Flash device semaphores */
 static int nextFrameIdx = 0; /* FIFO index for page replacement (4.5.4) */
@@ -128,8 +129,8 @@ void pager() {
 
   /* 3. Check for TLB-Modification (treat as trap) */
   if (excCode == EXC_TLBMOD) {
-    /* TODO: Section 4.8 - Pass to Program Trap handler */
-    SYSCALL(TERMINATEPROCESS, 0, 0, 0); /* Temporary */
+    /* Pass up to Support Level's general exception handler */
+    supportExceptionHandler();
   }
 
   /* 4. Lock Swap Pool */
@@ -180,16 +181,14 @@ void pager() {
     int oldPageIdx =
         (oldVpn == VPN_STACK) ? MAXPAGES - 1 : oldVpn - VPN_TEXT_BASE;
     if (writeFlashPage(oldAsid, oldPageIdx, frameAddr) < 0) {
-      /* TODO: Section 4.8 - Program Trap */
-      SYSCALL(TERMINATEPROCESS, 0, 0, 0); /* Temporary */
+      supportExceptionHandler(); /* I/O error as trap */
     }
   }
 
   /* 9. Read current process's page p into frame i */
   memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
   if (readFlashPage(sup->sup_asid, pageIdx, frameAddr) < 0) {
-    /* TODO: Section 4.8 - Program Trap */
-    SYSCALL(TERMINATEPROCESS, 0, 0, 0); /* Temporary */
+    supportExceptionHandler(); /* I/O error as trap */
   }
 
   /* 10. Update Swap Pool table */
