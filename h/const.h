@@ -118,6 +118,9 @@
 #define FLASH_READBLK       2
 #define FLASH_WRITEBLK      3
 
+/* Printer COMMAND codes */
+#define PRINTCHR            2
+
 /* Memory related constants */
 #define KSEG0           0x00000000
 #define KSEG1           0x20000000
@@ -182,7 +185,7 @@ For a 32-bit EntryLo, the format is:
 /* Macro to read the TOD clock */
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
 
-/* system call codes */
+/* Nucleus system call codes */
 #define	CREATEPROCESS	    1	  /* create process */
 #define	TERMINATEPROCESS	2	  /* terminate process */
 #define	PASSEREN			    3	  /* P a semaphore */
@@ -191,5 +194,17 @@ For a 32-bit EntryLo, the format is:
 #define	GETCPUTIME		    6	  /* get cpu time used to date */
 #define	WAITCLOCK		      7	  /* delay on the clock semaphore */
 #define	GETSUPPORTPTR     8	  /* return support structure ptr. */
+
+/* Support Level system code codes */
+#define TERMINATE         9   /* Terminate U-proc */
+#define GETTOD           10   /* Get Time of Day */
+#define WRITEPRINTER     11   /* Write to Printer */
+#define WRITETERMINAL    12   /* Write to Terminal */
+#define READTERMINAL     13   /* Read from Terminal */
+
+/* Device-specific constants */
+#define PRINTER_MAXLEN   128  /* Max length for SYS11 */
+#define TERMINAL_MAXLEN  128  /* Max length for SYS12 */
+
 
 #endif
