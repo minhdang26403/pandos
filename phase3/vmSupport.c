@@ -18,9 +18,6 @@
 #include "../h/types.h"
 #include "umps3/umps/libumps.h"
 
-/* Module-wide variables */
-static memaddr swapPool;
-
 /* Swap Pool Entry structure */
 typedef struct spte_t {
   int spte_asid; /* ASID (1-8) of the process that owns the page, -1 if free */
@@ -28,18 +25,20 @@ typedef struct spte_t {
   pte_t *spte_pte;       /* Pointer to Page Table entry */
 } spte_t;
 
+/* Module-wide variables */
+static memaddr swapPool; /* RAM frames set aside to support virtual memory */
 static spte_t swapPoolTable[SWAP_POOL_SIZE]; /* Swap Pool table */
 static int swapPoolSem;                      /* Swap Pool semaphore: mutex */
-
-/* Map ASID to flash device (1-8 -> 0-7) */
-static int flashDev[UPROCMAX] = {0, 1, 2, 3, 4, 5, 6, 7};
+static int flashSem[UPROCMAX] = {1, 1, 1, 1,
+                                 1, 1, 1, 1}; /* Flash device semaphores */
+static int nextFrameIdx = 0; /* FIFO index for page replacement (4.5.4) */
 
 /*
  * initSwapStructs
  * Initialize the Swap Pool data structures
  */
 void initSwapStructs() {
-  /* Swap Pool: 16 RAM frames set aside to support virtual memory. */
+  /* Place the Swap Pool after the end of the operating system code */
   swapPool = SWAP_POOL_BASE;
 
   int i;
@@ -50,55 +49,85 @@ void initSwapStructs() {
     swapPoolTable[i].spte_pte = NULL;
   }
 
-  /* Initialize Swap Pool semaphore to 1 (mutex) */
-  swapPoolSem = 1;
+  swapPoolSem = 1;  /* Initialize Swap Pool semaphore to 1 (mutex) */
+  nextFrameIdx = 0; /* Start at frame 0 */
 }
 
-/* Read 4 KB page from flash to RAM (Section 4.5.1 TBD) */
-static int readFlashPage(int asid, int pageIdx, memaddr dest) {
-  int devNum = flashDev[asid - 1];
+/* Read 4 KB page from flash to RAM */
+static int readFlashPage(int asid, int blockNum, memaddr dest) {
+  /* Map ASID to flash device (1-8 -> 0-7) */
+  int devNum = asid - 1;
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *flashReg =
       &busRegArea->devreg[DEVPERINT * (FLASHINT - DISKINT) + devNum];
 
-  flashReg->d_data0 = pageIdx * PAGESIZE;
-  flashReg->d_command = READBLK;
+  /* 1. Lock device register */
+  SYSCALL(PASSEREN, (int)&flashSem[devNum], 0, 0);
 
-  /* Stub: Wait for completion (needs SYS5 later) */
-  while ((flashReg->d_status & 0xFF) == BUSY);
-  if (flashReg->d_status != READY) return -1; /* Error */
-  copyState((state_t *)dest, (state_t *)(flashReg->d_data1));
+  /* 2. Set DMA address */
+  flashReg->d_data0 = dest;
+
+  /* 3. Set block number and command (atomic with SYS5) */
+  unsigned int command = (blockNum << 8) | FLASH_READBLK;
+  flashReg->d_command = command;
+
+  /* 4. Wait for I/O completion */
+  int status = SYSCALL(WAITIO, FLASHINT, devNum, 0);
+  /* TODO: do we need to mask status with `FLASH_STATUS_MASK` as for terminal
+   * devices? */
+  if (status != READY) {
+    SYSCALL(VERHOGEN, (int)&flashSem[devNum], 0, 0);
+    return -1; /* Error */
+  }
+
+  /* 5. Unlock device register */
+  SYSCALL(VERHOGEN, (int)&flashSem[devNum], 0, 0);
   return 0;
 }
 
-/* Write 4 KB page from RAM to flash (Section 4.5.1 TBD) */
-static int writeFlashPage(int asid, int pageIdx, memaddr src) {
-  int devNum = flashDev[asid - 1];
+/* Write 4 KB page from RAM to flash */
+static int writeFlashPage(int asid, int blockNum, memaddr src) {
+  /* Map ASID to flash device (1-8 -> 0-7) */
+  int devNum = asid - 1;
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *flashReg =
       &busRegArea->devreg[DEVPERINT * (FLASHINT - DISKINT) + devNum];
 
-  flashReg->d_data0 = pageIdx * PAGESIZE;
-  flashReg->d_data1 = src;
-  flashReg->d_command = WRITEBLK | (1 << 20); /* Write 4 KB */
+  /* 1. Lock device register */
+  SYSCALL(PASSEREN, (int)&flashSem[devNum], 0, 0);
 
-  /* Stub: Wait for completion (needs SYS5 later) */
-  while ((flashReg->d_status & 0xFF) == BUSY);
-  if (flashReg->d_status != READY) return -1; /* Error */
+  /* 2. Set DMA address */
+  flashReg->d_data0 = src;
+
+  /* 3. Set block number and command (atomic with SYS5) */
+  unsigned int command = (blockNum << 8) | FLASH_WRITEBLK;
+  flashReg->d_command = command;
+
+  /* 4. Wait for I/O completion */
+  int status = SYSCALL(WAITIO, FLASHINT, devNum, 0);
+  /* TODO: do we need to mask status with `FLASH_STATUS_MASK` as for terminal
+   * devices? */
+  if (status != READY) {
+    SYSCALL(VERHOGEN, (int)&flashSem[devNum], 0, 0);
+    return -1; /* Error */
+  }
+
+  /* 5. Unlock device register */
+  SYSCALL(VERHOGEN, (int)&flashSem[devNum], 0, 0);
   return 0;
 }
 
 /* TLB exception handler (Pager) */
 void pager() {
   /* 1. Get Support Structure via SYS8 */
-  support_t *sup = SYSCALL(GETSUPPORTPTR, 0, 0, 0);
+  support_t *sup = (support_t *)SYSCALL(GETSUPPORTPTR, 0, 0, 0);
 
   /* 2. Determine cause from sup_exceptState[0] */
   state_t *savedExcState = &sup->sup_exceptState[0];
-  unsigned int cause = CAUSE_EXCCODE(savedExcState->s_cause);
+  unsigned int excCode = CAUSE_EXCCODE(savedExcState->s_cause);
 
   /* 3. Check for TLB-Modification (treat as trap) */
-  if (CAUSE_EXCCODE(cause) == EXC_TLBMOD) {
+  if (excCode == EXC_TLBMOD) {
     /* TODO: Section 4.8 - Pass to Program Trap handler */
     SYSCALL(TERMINATEPROCESS, 0, 0, 0); /* Temporary */
   }
@@ -110,15 +139,9 @@ void pager() {
   unsigned int vpn = (savedExcState->s_entryHI & VPN_MASK) >> VPN_SHIFT;
   int pageIdx = (vpn == VPN_STACK) ? MAXPAGES - 1 : vpn - VPN_TEXT_BASE;
 
-  /* 6. Pick a frame (i) - Simple first-free for now (Section 4.5.4 TBD) */
-  int frameIdx;
-  for (frameIdx = 0; frameIdx < SWAP_POOL_SIZE; frameIdx++) {
-    if (swapPoolTable[frameIdx].spte_asid == ASID_UNOCCUPIED) break;
-  }
-  if (frameIdx == SWAP_POOL_SIZE) {
-    /* TODO: Section 4.5.4 - Page replacement algorithm */
-    PANIC(); /* Temporary */
-  }
+  /* 6. Pick a frame (i) - FIFO (Section 4.5.4) */
+  int frameIdx = nextFrameIdx;
+  nextFrameIdx = (nextFrameIdx + 1) % SWAP_POOL_SIZE; /* Round-robin */
 
   /* 7 & 8. Check if frame i is occupied */
   if (swapPoolTable[frameIdx].spte_asid != ASID_UNOCCUPIED) {
@@ -127,19 +150,35 @@ void pager() {
     pte_t *oldPte = swapPoolTable[frameIdx].spte_pte;
 
     /* 8.(a) Update old process's Page Table (V=0) */
+    unsigned int status = getSTATUS();
+    setSTATUS(status & ~STATUS_IEC); /* Disable interrupts */
     oldPte->pte_entryLO &= ~PTE_VALID;
 
-    /* 8.(b). Update TLB if cached (Section 4.5.3 TBD) */
+    /* 8.(b). Update TLB if cached - Atomic with 8.(a) */
     setENTRYHI(oldPte->pte_entryHI);
-    TLBP();                            /* Probe TLB */
-    if (!(getINDEX() & TLB_PRESENT)) { /* Match found (P=0) */
+    TLBP(); /* Probe TLB */
+    if (!(getINDEX() & TLB_PRESENT)) {
+      /* P=0: Match found */
       setENTRYLO(oldPte->pte_entryLO);
       TLBWI(); /* Update TLB atomically */
     }
+    setSTATUS(status); /* Reenable interrupts */
+
+    /*
+     * Why update Page Table/TLB before writing to backing store?
+     *
+     * If we wrote to flash first, then an interrupt (e.g., another Pager) could
+     * run and see the old Page Table entry (V=1) still pointing to this frame.
+     * It might reuse or overwrite the frame before the write completes, leading
+     * to data corruption in the backing store. Updating Page Table (V=0) and
+     * TLB first ensures the frame is marked invalid and uncached, preventing
+     * access during the write. Order matters for data integrity.
+     */
 
     /* 8.(c). Write to old process's backing store */
     memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
-    int oldPageIdx = (oldVpn == VPN_STACK) ? MAXPAGES - 1 : oldVpn - VPN_TEXT_BASE;
+    int oldPageIdx =
+        (oldVpn == VPN_STACK) ? MAXPAGES - 1 : oldVpn - VPN_TEXT_BASE;
     if (writeFlashPage(oldAsid, oldPageIdx, frameAddr) < 0) {
       /* TODO: Section 4.8 - Program Trap */
       SYSCALL(TERMINATEPROCESS, 0, 0, 0); /* Temporary */
@@ -160,12 +199,43 @@ void pager() {
 
   /* 11. Update Page Table (PFN and V=1) */
   pte_t *pte = &sup->sup_pageTable[pageIdx];
-  pte->pte_entryLO = ZERO_MASK | (frameAddr & PFN_MASK) | PTE_DIRTY | PTE_VALID;
+  unsigned int status = getSTATUS();
+  setSTATUS(status & ~STATUS_IEC); /* Disable interrupts */
+  pte->pte_entryLO = (frameAddr & PFN_MASK) | PTE_DIRTY | PTE_VALID;
 
   /* 12. Update TLB (atomic with 11) */
   setEntryHI(pte->pte_entryHI);
-  setEntryLO(pte->pte_entryLO);
-  TLBWR(); /* Random slot */
+  TLBP();
+  if (!(getINDEX() & TLB_PRESENT)) {
+    /* P=0: Match found */
+    setENTRYLO(pte->pte_entryLO);
+    TLBWI();
+  } else {
+    /* P=1: No match, add new entry */
+    setENTRYLO(pte->pte_entryLO);
+    TLBWR(); /* Random slot */
+  }
+  setSTATUS(status); /* Reenable interrupts */
+
+  /*
+   * Why read from backing store before updating Page Table/TLB?
+   *
+   * If we updated the Page Table (V=1) and TLB first, an interrupt could occur
+   * before the read completes, allowing the process to access the frame. Since
+   * the frame hasn't been loaded from flash yet, it'd access stale or garbage
+   * data, causing incorrect execution. Reading first ensures the frame has
+   * valid data before it's marked present and cached. Order prevents data
+   * races.
+   *
+   * Why must Page Table and TLB updates be atomic?
+   *
+   * If an interrupt occurs between updating the Page Table (e.g., V=1) and the
+   * TLB, another Pager or the process itself could see an inconsistent state:
+   * the Page Table says the page is valid, but the TLB might still have an old
+   * entry (V=0) or none at all. This could trigger spurious faults or access
+   * wrong frames. Disabling interrupts ensures both updates happen as a single,
+   * uninterruptible unit, maintaining consistency.
+   */
 
   /* 13. Unlock Swap Pool */
   SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);

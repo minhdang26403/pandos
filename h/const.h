@@ -103,7 +103,9 @@
 #define BUSY			        3
 #define CHAR_RECEIVED     5   /* Terminal receive completion */
 #define CHAR_TRANSMITTED  5   /* Terminal transmit completion */
-/* For terminal devices, their status code is stored in the first byte 
+
+/* 
+ * For terminal devices, their status code is stored in the first byte 
  * of the 32-bit TRANSM_STATUS/RECV_STATUS field */
 #define TERMINT_STATUS_MASK 0xFF
 
@@ -111,9 +113,9 @@
 #define RESET			    0
 #define ACK				    1
 
-/* flash device command codes */
-#define READBLK       2
-#define WRITEBLK      3
+/* Flash COMMAND codes */
+#define FLASH_READBLK       2
+#define FLASH_WRITEBLK      3
 
 /* Memory related constants */
 #define KSEG0           0x00000000
@@ -129,6 +131,7 @@
 /* Constants for VM management */
 #define MAXPAGES        32                          /* 32 pages per U-proc */
 #define UPROCMAX        8                           /* Maximum number of concurrent user processes */
+#define STACKPAGE      (MAXPAGES - 1)               /* Page 31 for stack */
 
 #define SWAP_POOL_SIZE  (2 * UPROCMAX)              /* Size of the Swap Pool */
 #define SWAP_POOL_BASE  (RAMSTART + 32 * PAGESIZE)  /* Starting address of the Swap Pool */
