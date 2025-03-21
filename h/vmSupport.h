@@ -9,8 +9,6 @@
  *  Written by Dang Truong
  */
 
-extern int swapPoolSem; /* Swap Pool semaphore: mutex */
-
 void initSwapStructs();
 void pager();
 

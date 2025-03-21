@@ -10,5 +10,6 @@
 
 
 void supportExceptionHandler();
+void programTrapHandler();
 
 #endif

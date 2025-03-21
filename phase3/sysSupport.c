@@ -19,7 +19,7 @@
 #include "umps3/umps/libumps.h"
 
 HIDDEN void syscallHandler(support_t *sup);
-HIDDEN void programTrapHandler(support_t *sup);
+void programTrapHandler();
 
 /* Validate virtual address is in U-proc's logical space (KUSEG) */
 HIDDEN int isValidAddr(support_t *sup, memaddr addr) {
@@ -40,7 +40,7 @@ void supportExceptionHandler() {
     syscallHandler(sup);
   } else {
     /* All non-SYSCALL causes (including EXC_TLBMOD) are traps */
-    programTrapHandler(sup);
+    programTrapHandler();
   }
 }
 
@@ -62,7 +62,7 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
   /* Validate inputs: entire string must be in KUSEG */
   if (!isValidAddr(sup, virtAddr) || len < 0 || len > PRINTER_MAXLEN ||
       (len > 0 && !isValidAddr(sup, virtAddr + len - 1))) {
-    programTrapHandler(sup);
+    programTrapHandler();
   }
 
   SYSCALL(PASSEREN, (int)&deviceSem[devIdx], 0, 0);
@@ -104,7 +104,7 @@ HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
   /* Validate inputs: entire string must be in KUSEG */
   if (!isValidAddr(sup, virtAddr) || len < 0 || len > TERMINAL_MAXLEN ||
       (len > 0 && !isValidAddr(sup, virtAddr + len - 1))) {
-    programTrapHandler(sup);
+    programTrapHandler();
   }
 
   SYSCALL(PASSEREN, (int)&deviceSem[devIdx], 0, 0);
@@ -153,7 +153,8 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
       char c = (status >> BYTELEN) & TERMINT_STATUS_MASK;
       /* Validate each buffer address before writing */
       if (!isValidAddr(sup, (memaddr)buffer)) {
-        programTrapHandler(sup); /* Buffer overflow */
+        SYSCALL(VERHOGEN, (int)&deviceSem[devIdx], 0, 0);
+        programTrapHandler(); /* Buffer overflow */
       }
       *buffer = c;
       buffer++;
@@ -205,16 +206,11 @@ HIDDEN void syscallHandler(support_t *sup) {
         break;
     }
   } else {
-    programTrapHandler(sup);
+    programTrapHandler();
   }
 }
 
 /* Program Trap Exception Handler */
-HIDDEN void programTrapHandler(support_t *sup) {
-  /* Release Swap Pool semaphore if held */
-  if (swapPoolSem == 0) {
-    SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
-  }
-
-  SYSCALL(TERMINATEPROCESS, 0, 0, 0);
+void programTrapHandler() {
+  sysTerminate();
 }
