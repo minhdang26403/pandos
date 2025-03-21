@@ -31,12 +31,12 @@ void supportExceptionHandler() {
   support_t *sup = (support_t *)SYSCALL(GETSUPPORTPTR, 0, 0, 0);
 
   /* Use PGFAULTEXCEPT for TLB traps, GENERALEXCEPT for others */
-  int causeIdx =
-      (CAUSE_EXCCODE(getCAUSE()) == EXC_TLBMOD) ? PGFAULTEXCEPT : GENERALEXCEPT;
+  unsigned int cause = getCAUSE();
+  unsigned int excCode = CAUSE_EXCCODE(cause);
+  int causeIdx = (excCode == EXC_TLBMOD) ? PGFAULTEXCEPT : GENERALEXCEPT;
   state_t *excState = &sup->sup_exceptState[causeIdx];
-  unsigned int cause = CAUSE_EXCCODE(excState->s_cause);
 
-  if (cause == EXC_SYSCALL) {
+  if (excCode == EXC_SYSCALL) {
     syscallHandler(sup);
   } else {
     /* All non-SYSCALL causes (including EXC_TLBMOD) are traps */
@@ -59,8 +59,9 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *printer = &busRegArea->devreg[devIdx];
 
-  /* Validate inputs */
-  if (!isValidAddr(sup, virtAddr) || len < 0 || len > PRINTER_MAXLEN) {
+  /* Validate inputs: entire string must be in KUSEG */
+  if (!isValidAddr(sup, virtAddr) || len < 0 || len > PRINTER_MAXLEN ||
+      (len > 0 && !isValidAddr(sup, virtAddr + len - 1))) {
     programTrapHandler(sup);
   }
 
@@ -68,35 +69,116 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
 
   /* Send each character up to len */
   char *s = (char *)virtAddr;
+  int status = READY; /* Default for len = 0 */
   int i;
   for (i = 0; i < len; i++) {
     printer->d_data0 = s[i]; /* Low byte gets char */
     printer->d_command = PRINTCHR;
 
-    int status = SYSCALL(WAITIO, PRNTINT, devNum, 0);
-    if (status == READY) {
-      printer->d_command = ACK; /* Acknowledge interrupt */
-    } else {
-      excState->s_v0 = -status; /* Error: negative status */
+    status = SYSCALL(WAITIO, PRNTINT, devNum, 0);
+    if (status != READY) {
       break;
     }
   }
 
-  if (i == len) {
+  if (status == READY) {
     /* Success: all chars sent */
     excState->s_v0 = len;
+  } else {
+    /* Error: negative status */
+    excState->s_v0 = -status;
   }
+
   SYSCALL(VERHOGEN, (int)&deviceSem[devIdx], 0, 0);
   switchContext(excState);
 }
 
-HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {}
+HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
+  memaddr virtAddr = excState->s_a1;
+  int len = excState->s_a2;
+  int devNum = sup->sup_asid - 1; /* ASID 1-8 -> 0-7 */
+  int devIdx = (TERMINT - DISKINT) * DEVPERINT + devNum;
+  devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
+  device_t *terminal = &busRegArea->devreg[devIdx];
 
-HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {}
+  /* Validate inputs: entire string must be in KUSEG */
+  if (!isValidAddr(sup, virtAddr) || len < 0 || len > TERMINAL_MAXLEN ||
+      (len > 0 && !isValidAddr(sup, virtAddr + len - 1))) {
+    programTrapHandler(sup);
+  }
 
-/* SYSCALL Exception Handler (Section 4.7) - Placeholder */
+  SYSCALL(PASSEREN, (int)&deviceSem[devIdx], 0, 0);
+
+  /* Send each character up to len */
+  char *s = (char *)virtAddr;
+  int status = CHAR_TRANSMITTED; /* Default for len = 0 */
+  int i;
+  for (i = 0; i < len; i++) {
+    terminal->t_transm_command = TRANSMITCHAR | (s[i] << BYTELEN);
+    status = SYSCALL(WAITIO, TERMINT, devNum, FALSE);
+    if ((status & TERMINT_STATUS_MASK) != CHAR_TRANSMITTED) {
+      break;
+    }
+  }
+
+  if ((status & TERMINT_STATUS_MASK) == CHAR_TRANSMITTED) {
+    /* Success: all chars sent */
+    excState->s_v0 = len;
+  } else {
+    /* Error: negative status */
+    excState->s_v0 = -status;
+  }
+
+  SYSCALL(VERHOGEN, (int)&deviceSem[devIdx], 0, 0);
+  switchContext(excState);
+}
+
+HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
+  memaddr virtAddr = excState->s_a1;
+  int devNum = sup->sup_asid - 1; /* ASID 1-8 -> 0-7 */
+  int devIdx = (TERMINT - DISKINT) * DEVPERINT + devNum + DEVPERINT;
+  devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
+  device_t *terminal = &busRegArea->devreg[devIdx];
+
+  SYSCALL(PASSEREN, (int)&deviceSem[devIdx], 0, 0);
+
+  /* Read each character up to len */
+  char *buffer = (char *)virtAddr;
+  int status;
+
+  while (TRUE) {
+    terminal->t_recv_command = RECEIVECHAR;
+    status = SYSCALL(WAITIO, TERMINT, devNum, TRUE);
+    if ((status & TERMINT_STATUS_MASK) == CHAR_RECEIVED) {
+      char c = (status >> BYTELEN) & TERMINT_STATUS_MASK;
+      /* Validate each buffer address before writing */
+      if (!isValidAddr(sup, (memaddr)buffer)) {
+        programTrapHandler(sup); /* Buffer overflow */
+      }
+      *buffer = c;
+      buffer++;
+      if (c == '\n') {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+
+  if ((status & TERMINT_STATUS_MASK) == CHAR_RECEIVED) {
+    /* Success: all chars read */
+    excState->s_v0 = buffer - (char *)virtAddr;
+  } else {
+    /* Error: negative status */
+    excState->s_v0 = -status;
+  }
+
+  SYSCALL(VERHOGEN, (int)&deviceSem[devIdx], 0, 0);
+  switchContext(excState);
+}
+
+/* System Call Exception Handler */
 HIDDEN void syscallHandler(support_t *sup) {
-  /* TODO: Section 4.7 - SYS9+ */
   state_t *excState = &sup->sup_exceptState[GENERALEXCEPT];
   int syscallNum = excState->s_a0;
 

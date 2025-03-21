@@ -10,6 +10,7 @@
 /* Hardware & software constants */
 #define PAGESIZE		  4096			/* page size in bytes	*/
 #define WORDLEN			  4				  /* word size in bytes	*/
+#define BYTELEN       8
 #define MAXINT        2147483647
 
 #define MAXPROC       20        /* Maximum number of concurrent processes */
@@ -102,13 +103,6 @@
 #define UNINSTALLED		    0
 #define READY			        1
 #define BUSY			        3
-#define CHAR_RECEIVED     5   /* Terminal receive completion */
-#define CHAR_TRANSMITTED  5   /* Terminal transmit completion */
-
-/* 
- * For terminal devices, their status code is stored in the first byte 
- * of the 32-bit TRANSM_STATUS/RECV_STATUS field */
-#define TERMINT_STATUS_MASK 0xFF
 
 /* device common COMMAND codes */
 #define RESET			    0
@@ -120,6 +114,19 @@
 
 /* Printer COMMAND codes */
 #define PRINTCHR            2
+
+/* terminal device related constants */
+#define TRANSMITCHAR  2
+#define RECEIVECHAR   2
+
+#define CHAR_RECEIVED     5   /* Terminal receive completion */
+#define CHAR_TRANSMITTED  5   /* Terminal transmit completion */
+
+/* 
+ * For terminal devices, their status code is stored in the first byte 
+ * of the 32-bit TRANSM_STATUS/RECV_STATUS field 
+ */
+#define TERMINT_STATUS_MASK 0xFF
 
 /* Memory related constants */
 #define KSEG0           0x00000000
