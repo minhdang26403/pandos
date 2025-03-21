@@ -14,6 +14,7 @@
 
 #include "../h/const.h"
 #include "../h/exceptions.h"
+#include "../h/initial.h"
 #include "../h/scheduler.h"
 #include "../h/sysSupport.h"
 #include "../h/types.h"
@@ -30,8 +31,6 @@ typedef struct spte_t {
 static memaddr swapPool; /* RAM frames set aside to support virtual memory */
 static spte_t swapPoolTable[SWAP_POOL_SIZE]; /* Swap Pool table */
 int swapPoolSem;                             /* Swap Pool semaphore: mutex */
-static int flashSem[UPROCMAX] = {1, 1, 1, 1,
-                                 1, 1, 1, 1}; /* Flash device semaphores */
 static int nextFrameIdx = 0; /* FIFO index for page replacement (4.5.4) */
 
 /*
@@ -58,31 +57,31 @@ void initSwapStructs() {
 static int readFlashPage(int asid, int blockNum, memaddr dest) {
   /* Map ASID to flash device (1-8 -> 0-7) */
   int devNum = asid - 1;
+  int devIdx = (FLASHINT - DISKINT) * DEVPERINT + devNum;
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
-  device_t *flashReg =
-      &busRegArea->devreg[DEVPERINT * (FLASHINT - DISKINT) + devNum];
+  device_t *flash = &busRegArea->devreg[devIdx];
 
   /* 1. Lock device register */
-  SYSCALL(PASSEREN, (int)&flashSem[devNum], 0, 0);
+  SYSCALL(PASSEREN, (int)&deviceSem[devNum], 0, 0);
 
   /* 2. Set DMA address */
-  flashReg->d_data0 = dest;
+  flash->d_data0 = dest;
 
   /* 3. Set block number and command (atomic with SYS5) */
   unsigned int command = (blockNum << 8) | FLASH_READBLK;
-  flashReg->d_command = command;
+  flash->d_command = command;
 
   /* 4. Wait for I/O completion */
   int status = SYSCALL(WAITIO, FLASHINT, devNum, 0);
   /* TODO: do we need to mask status with `FLASH_STATUS_MASK` as for terminal
    * devices? */
   if (status != READY) {
-    SYSCALL(VERHOGEN, (int)&flashSem[devNum], 0, 0);
+    SYSCALL(VERHOGEN, (int)&deviceSem[devNum], 0, 0);
     return -1; /* Error */
   }
 
   /* 5. Unlock device register */
-  SYSCALL(VERHOGEN, (int)&flashSem[devNum], 0, 0);
+  SYSCALL(VERHOGEN, (int)&deviceSem[devNum], 0, 0);
   return 0;
 }
 
@@ -90,31 +89,31 @@ static int readFlashPage(int asid, int blockNum, memaddr dest) {
 static int writeFlashPage(int asid, int blockNum, memaddr src) {
   /* Map ASID to flash device (1-8 -> 0-7) */
   int devNum = asid - 1;
+  int devIdx = (FLASHINT - DISKINT) * DEVPERINT + devNum;
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
-  device_t *flashReg =
-      &busRegArea->devreg[DEVPERINT * (FLASHINT - DISKINT) + devNum];
+  device_t *flash = &busRegArea->devreg[devIdx];
 
   /* 1. Lock device register */
-  SYSCALL(PASSEREN, (int)&flashSem[devNum], 0, 0);
+  SYSCALL(PASSEREN, (int)&deviceSem[devNum], 0, 0);
 
   /* 2. Set DMA address */
-  flashReg->d_data0 = src;
+  flash->d_data0 = src;
 
   /* 3. Set block number and command (atomic with SYS5) */
   unsigned int command = (blockNum << 8) | FLASH_WRITEBLK;
-  flashReg->d_command = command;
+  flash->d_command = command;
 
   /* 4. Wait for I/O completion */
   int status = SYSCALL(WAITIO, FLASHINT, devNum, 0);
   /* TODO: do we need to mask status with `FLASH_STATUS_MASK` as for terminal
    * devices? */
   if (status != READY) {
-    SYSCALL(VERHOGEN, (int)&flashSem[devNum], 0, 0);
+    SYSCALL(VERHOGEN, (int)&deviceSem[devNum], 0, 0);
     return -1; /* Error */
   }
 
   /* 5. Unlock device register */
-  SYSCALL(VERHOGEN, (int)&flashSem[devNum], 0, 0);
+  SYSCALL(VERHOGEN, (int)&deviceSem[devNum], 0, 0);
   return 0;
 }
 
