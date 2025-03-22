@@ -114,6 +114,13 @@ typedef struct pte_t {
   unsigned int pte_entryLO;
 } pte_t;
 
+/* Swap Pool Entry structure */
+typedef struct spte_t {
+  int spte_asid; /* ASID (1-8) of the process that owns the page, -1 if free */
+  unsigned int spte_vpn; /* Virtual Page Number */
+  pte_t *spte_pte;       /* Pointer to Page Table entry */
+} spte_t;
+
 typedef struct support_t {
   int           sup_asid;                   /* Process Id (asid) */
   state_t       sup_exceptState[2];         /* stored excpt states */

@@ -9,6 +9,10 @@
  *  Written by Dang Truong
  */
 
+extern memaddr swapPool;
+extern spte_t swapPoolTable[SWAP_POOL_SIZE];
+extern int swapPoolSem;
+
 void initSwapStructs();
 void pager();
 

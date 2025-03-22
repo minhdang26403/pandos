@@ -20,7 +20,7 @@
 #include "umps3/umps/libumps.h"
 
 HIDDEN void syscallHandler(support_t *sup);
-void programTrapHandler();
+void programTrapHandler(support_t *sup);
 
 /* Validate virtual address is in U-proc's logical space (KUSEG) */
 HIDDEN int isValidAddr(support_t *sup, memaddr addr) {
@@ -41,11 +41,30 @@ void supportExceptionHandler() {
     syscallHandler(sup);
   } else {
     /* All non-SYSCALL causes (including EXC_TLBMOD) are traps */
-    programTrapHandler();
+    programTrapHandler(sup);
   }
 }
 
-HIDDEN void sysTerminate() { SYSCALL(TERMINATEPROCESS, 0, 0, 0); }
+HIDDEN void sysTerminate(support_t *sup) {
+  /* Gain a mutual exclusion on Swap Pool */
+  SYSCALL(PASSEREN, (int)&swapPoolSem, 0, 0);
+
+  /* Free frames occupied by this U-proc */
+  int asid = sup->sup_asid;
+  int i;
+  for (i = 0; i < SWAP_POOL_SIZE; i++) {
+    if (swapPoolTable[i].spte_asid == asid) {
+      swapPoolTable[i].spte_asid = -1;
+      swapPoolTable[i].spte_vpn = 0;
+      swapPoolTable[i].spte_pte = NULL;
+    }
+  }
+
+  SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
+
+  /* Terminate the process */
+  SYSCALL(TERMINATEPROCESS, 0, 0, 0);
+}
 
 HIDDEN void sysGetTOD(state_t *excState) {
   STCK(excState->s_v0);
@@ -63,7 +82,7 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
   /* Validate inputs: entire string must be in KUSEG */
   if (!isValidAddr(sup, virtAddr) || len < 0 || len > PRINTER_MAXLEN ||
       (len > 0 && !isValidAddr(sup, virtAddr + len - 1))) {
-    programTrapHandler();
+    programTrapHandler(sup);
   }
 
   SYSCALL(PASSEREN, (int)&supportDeviceSem[devIdx], 0, 0);
@@ -112,7 +131,7 @@ HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
   /* Validate inputs: entire string must be in KUSEG */
   if (!isValidAddr(sup, virtAddr) || len < 0 || len > TERMINAL_MAXLEN ||
       (len > 0 && !isValidAddr(sup, virtAddr + len - 1))) {
-    programTrapHandler();
+    programTrapHandler(sup);
   }
 
   SYSCALL(PASSEREN, (int)&supportDeviceSem[devIdx], 0, 0);
@@ -174,7 +193,7 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
       /* Validate each buffer address before writing */
       if (!isValidAddr(sup, (memaddr)buffer)) {
         SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
-        programTrapHandler(); /* Buffer overflow */
+        programTrapHandler(sup); /* Buffer overflow */
       }
       *buffer = c;
       buffer++;
@@ -208,7 +227,7 @@ HIDDEN void syscallHandler(support_t *sup) {
                                   returned to the next instruction */
     switch (syscallNum) {
       case TERMINATE:
-        sysTerminate();
+        sysTerminate(sup);
         break;
       case GETTOD:
         sysGetTOD(excState);
@@ -226,9 +245,9 @@ HIDDEN void syscallHandler(support_t *sup) {
         break;
     }
   } else {
-    programTrapHandler();
+    programTrapHandler(sup);
   }
 }
 
 /* Program Trap Exception Handler */
-void programTrapHandler() { sysTerminate(); }
+void programTrapHandler(support_t *sup) { sysTerminate(sup); }

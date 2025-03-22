@@ -10,6 +10,6 @@
 
 
 void supportExceptionHandler();
-void programTrapHandler();
+void programTrapHandler(support_t *sup);
 
 #endif
