@@ -512,7 +512,7 @@ void uTLB_RefillHandler() {
   support_t *sup = currentProc->p_supportStruct;
   if (sup == NULL) {
     /* Consistent with Phase 2 behavior (pass up or die) */
-    sysTerminateProc(currentProc);
+    sysTerminateProc(savedExcState);
   }
   pte_t *pte = &sup->sup_privatePgTbl[pageIdx];
 

@@ -8,6 +8,7 @@
  *  Written by Dang Truong
  */
 
+#include "../h/types.h"
 
 void supportExceptionHandler();
 void programTrapHandler(support_t *sup);

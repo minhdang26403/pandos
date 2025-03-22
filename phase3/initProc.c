@@ -13,6 +13,7 @@
 #include "../h/exceptions.h"
 #include "../h/sysSupport.h"
 #include "../h/vmSupport.h"
+#include "umps3/umps/libumps.h"
 
 /* Support Level's global variables */
 int masterSemaphore;              /* Master semaphore for termination */
@@ -65,12 +66,13 @@ HIDDEN void initSupportStruct(support_t *sup, int asid) {
 /* The instantiator process. Note that the Nucleus (Level 3/Phase 2) has an
  * external reference to this function */
 void test() {
+  int i;
+
   /* Initialize the Swap Pool table and Swap Pool semaphore */
   initSwapStructs();
 
   /* Initialize support level device semaphores to 1 since they will be used for
    * mutual exclusion */
-  int i;
   for (i = 0; i < NUMDEVICES; i++) {
     supportDeviceSem[i] = 1;
   }
@@ -90,7 +92,7 @@ void test() {
 
   /* Wait for all U-procs to terminate */
   masterSemaphore = 0;
-  for (int i = 0; i < MAX_UPROCS; i++) {
+  for (i = 0; i < MAX_UPROCS; i++) {
     SYSCALL(PASSEREN, (int)&masterSemaphore, 0, 0);
   }
 

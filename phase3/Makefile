@@ -52,6 +52,23 @@ kernel: $(OBJS)
 %.o: %.c $(DEFS)
 	$(CC) $(CFLAGS) $<
 
+asl.o: ../phase1/asl.c $(DEFS)
+	$(CC) $(CFLAGS) $<
+
+pcb.o: ../phase1/pcb.c $(DEFS)
+	$(CC) $(CFLAGS) $<
+
+initial.o: ../phase2/initial.c $(DEFS)
+	$(CC) $(CFLAGS) $<
+
+interrupts.o: ../phase2/interrupts.c $(DEFS)
+	$(CC) $(CFLAGS) $<
+
+scheduler.o: ../phase2/scheduler.c $(DEFS)
+	$(CC) $(CFLAGS) $<
+
+exceptions.o: ../phase2/exceptions.c $(DEFS)
+	$(CC) $(CFLAGS) $<
 
 clean:
 	rm -f *.o *.umps kernel

@@ -109,12 +109,6 @@ void main() {
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   p->p_s.s_sp = RAMSTART + busRegArea->ramsize;
 
-  /* TODO: do we need this? */
-  if (busRegArea->ramsize <
-      SWAP_POOL_BASE - RAMSTART + SWAP_POOL_SIZE * PAGESIZE + PAGESIZE) {
-    PANIC(); /* Insufficient RAM */
-  }
-
   /* Set PC to jump to the test function of p2test.c */
   p->p_s.s_pc = (memaddr)test;
   p->p_s.s_t9 = (memaddr)test; /* This register must get the same value as

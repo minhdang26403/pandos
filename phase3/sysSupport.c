@@ -15,6 +15,7 @@
 #include "../h/const.h"
 #include "../h/initProc.h"
 #include "../h/initial.h"
+#include "../h/scheduler.h"
 #include "../h/types.h"
 #include "../h/vmSupport.h"
 #include "umps3/umps/libumps.h"
@@ -30,12 +31,7 @@ HIDDEN int isValidAddr(support_t *sup, memaddr addr) {
 /* Support Level General Exception Handler */
 void supportExceptionHandler() {
   support_t *sup = (support_t *)SYSCALL(GETSUPPORTPTR, 0, 0, 0);
-
-  /* Use PGFAULTEXCEPT for TLB traps, GENERALEXCEPT for others */
-  unsigned int cause = getCAUSE();
-  unsigned int excCode = CAUSE_EXCCODE(cause);
-  int causeIdx = (excCode == EXC_TLBMOD) ? PGFAULTEXCEPT : GENERALEXCEPT;
-  state_t *excState = &sup->sup_exceptState[causeIdx];
+  unsigned int excCode = CAUSE_EXCCODE(getCAUSE());
 
   if (excCode == EXC_SYSCALL) {
     syscallHandler(sup);
@@ -100,11 +96,10 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
 
     /* Disable interrupts to ensure writing the COMMAND field and executing SYS5
      * (WAITIO) happens atomically */
-    unsigned int status = getSTATUS();
     setSTATUS(status & ~STATUS_IEC);
     printer->d_command = PRINTCHR;
     status = SYSCALL(WAITIO, PRNTINT, devNum, 0);
-    setSTATUS(status); /* Reenable interrupts */
+    setSTATUS(status | STATUS_IEC); /* Reenable interrupts */
 
     if (status != READY) {
       break;
@@ -146,11 +141,10 @@ HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
   for (i = 0; i < len; i++) {
     /* Disable interrupts to ensure writing the COMMAND field and executing SYS5
      * (WAITIO) happens atomically */
-    unsigned int status = getSTATUS();
     setSTATUS(status & ~STATUS_IEC);
     terminal->t_transm_command = TRANSMITCHAR | (s[i] << BYTELEN);
     status = SYSCALL(WAITIO, TERMINT, devNum, FALSE);
-    setSTATUS(status); /* Reenable interrupts */
+    setSTATUS(status | STATUS_IEC); /* Reenable interrupts */
 
     if ((status & TERMINT_STATUS_MASK) != CHAR_TRANSMITTED) {
       break;
@@ -185,11 +179,10 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
   while (TRUE) {
     /* Disable interrupts to ensure writing the COMMAND field and executing SYS5
      * (WAITIO) happens atomically */
-    unsigned int status = getSTATUS();
     setSTATUS(status & ~STATUS_IEC);
     terminal->t_recv_command = RECEIVECHAR;
     status = SYSCALL(WAITIO, TERMINT, devNum, TRUE);
-    setSTATUS(status); /* Reenable interrupts */
+    setSTATUS(status | STATUS_IEC); /* Reenable interrupts */
 
     if ((status & TERMINT_STATUS_MASK) == CHAR_RECEIVED) {
       char c = (status >> BYTELEN) & TERMINT_STATUS_MASK;

@@ -119,7 +119,7 @@ void uTLB_ExceptionHandler() {
   support_t *sup = (support_t *)SYSCALL(GETSUPPORTPTR, 0, 0, 0);
 
   /* 2. Determine cause from sup_exceptState[0] */
-  state_t *savedExcState = &sup->sup_exceptState[0];
+  state_t *savedExcState = &sup->sup_exceptState[PGFAULTEXCEPT];
   unsigned int excCode = CAUSE_EXCCODE(savedExcState->s_cause);
 
   /* 3. Check for TLB-Modification (treat as trap) */
@@ -199,7 +199,7 @@ void uTLB_ExceptionHandler() {
   pte->pte_entryLO = (frameAddr & PFN_MASK) | PTE_DIRTY | PTE_VALID;
 
   /* 12. Update TLB (atomic with 11) */
-  setEntryHI(pte->pte_entryHI);
+  setENTRYHI(pte->pte_entryHI);
   TLBP();
   if (!(getINDEX() & TLB_PRESENT)) {
     /* P=0: Match found */
@@ -236,5 +236,5 @@ void uTLB_ExceptionHandler() {
   SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
 
   /* 14. Restart process */
-  switchContext(&savedExcState);
+  switchContext(savedExcState);
 }

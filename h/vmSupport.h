@@ -9,6 +9,9 @@
  *  Written by Dang Truong
  */
 
+#include "../h/types.h"
+#include "../h/const.h"
+
 extern memaddr swapPool;
 extern spte_t swapPoolTable[SWAP_POOL_SIZE];
 extern int swapPoolSem;
