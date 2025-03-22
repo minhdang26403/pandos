@@ -114,7 +114,7 @@ static int writeFlashPage(int asid, int blockNum, memaddr src) {
 }
 
 /* TLB exception handler (Pager) */
-void pager() {
+void uTLB_ExceptionHandler() {
   /* 1. Get Support Structure via SYS8 */
   support_t *sup = (support_t *)SYSCALL(GETSUPPORTPTR, 0, 0, 0);
 

@@ -49,7 +49,7 @@ HIDDEN void initSupportStruct(support_t *sup, int asid) {
 
   /* TLB exception context */
   context_t *excCtxTLB = &sup->sup_exceptContext[PGFAULTEXCEPT];
-  excCtxTLB->c_pc = (memaddr)pager;
+  excCtxTLB->c_pc = (memaddr)uTLB_ExceptionHandler;
   excCtxTLB->c_status = STATUS_IEP | STATUS_IM_ALL_ON | STATUS_TE;
   excCtxTLB->c_stackPtr = (memaddr)&sup->sup_stackTLB[499];
 

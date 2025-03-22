@@ -14,6 +14,6 @@ extern spte_t swapPoolTable[SWAP_POOL_SIZE];
 extern int swapPoolSem;
 
 void initSwapStructs();
-void pager();
+void uTLB_ExceptionHandler();
 
 #endif
