@@ -15,7 +15,7 @@
 #include "../h/vmSupport.h"
 
 /* Support Level's global variables */
-int masterSemaphore;
+int masterSemaphore;              /* Master semaphore for termination */
 int supportDeviceSem[NUMDEVICES]; /* support level device semaphore */
 
 /* Initialize a U-proc's processor state */
@@ -88,7 +88,12 @@ void test() {
     SYSCALL(CREATEPROCESS, (int)&uProcState, (int)sup, 0);
   }
 
-  /* Wait for all U-proc "children" processes to finish */
-  int waitSem = 0;
-  SYSCALL(PASSEREN, (int)&waitSem, 0, 0);
+  /* Wait for all U-procs to terminate */
+  masterSemaphore = 0;
+  for (int i = 0; i < MAX_UPROCS; i++) {
+    SYSCALL(PASSEREN, (int)&masterSemaphore, 0, 0);
+  }
+
+  /* All U-procs done—terminate gracefully */
+  SYSCALL(TERMINATEPROCESS, 0, 0, 0); /* Triggers HALT */
 }

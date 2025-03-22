@@ -11,6 +11,7 @@
 #include "../h/const.h"
 #include "../h/types.h"
 
+extern int masterSemaphore;
 extern int supportDeviceSem[NUMDEVICES];
 
 #endif

@@ -62,6 +62,9 @@ HIDDEN void sysTerminate(support_t *sup) {
 
   SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
 
+  /* Signal termination to test */
+  SYSCALL(VERHOGEN, (int)&masterSemaphore, 0, 0);
+
   /* Terminate the process */
   SYSCALL(TERMINATEPROCESS, 0, 0, 0);
 }
