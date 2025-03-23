@@ -133,6 +133,7 @@
 #define KSEG1           0x20000000
 #define KSEG2           0x40000000
 #define KUSEG           0x80000000
+#define MAXADDR         0xFFFFFFFF
 #define RAMSTART        0x20000000
 #define BIOSDATAPAGE    0x0FFFF000
 #define	PASSUPVECTOR	  0x0FFFF900

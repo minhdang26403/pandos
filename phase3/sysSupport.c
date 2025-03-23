@@ -24,14 +24,15 @@ HIDDEN void syscallHandler(support_t *sup);
 void programTrapHandler(support_t *sup);
 
 /* Validate virtual address is in U-proc's logical space (KUSEG) */
-HIDDEN int isValidAddr(support_t *sup, memaddr addr) {
-  return (addr >= KUSEG && addr < (KUSEG + (MAXPAGES * PAGESIZE)));
+HIDDEN int isValidAddr(memaddr addr) {
+  return addr >= KUSEG && addr <= MAXADDR;
 }
 
 /* Support Level General Exception Handler */
 void supportExceptionHandler() {
   support_t *sup = (support_t *)SYSCALL(GETSUPPORTPTR, 0, 0, 0);
-  unsigned int excCode = CAUSE_EXCCODE(getCAUSE());
+  unsigned int excCode =
+      CAUSE_EXCCODE(sup->sup_exceptState[GENERALEXCEPT].s_cause);
 
   if (excCode == EXC_SYSCALL) {
     syscallHandler(sup);
@@ -79,8 +80,8 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
   device_t *printer = &busRegArea->devreg[devIdx];
 
   /* Validate inputs: entire string must be in KUSEG */
-  if (!isValidAddr(sup, virtAddr) || len < 0 || len > PRINTER_MAXLEN ||
-      (len > 0 && !isValidAddr(sup, virtAddr + len - 1))) {
+  if (!isValidAddr(virtAddr) || len < 0 || len > PRINTER_MAXLEN ||
+      (len > 0 && !isValidAddr(virtAddr + len - 1))) {
     programTrapHandler(sup);
   }
 
@@ -127,8 +128,8 @@ HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
   device_t *terminal = &busRegArea->devreg[devIdx];
 
   /* Validate inputs: entire string must be in KUSEG */
-  if (!isValidAddr(sup, virtAddr) || len < 0 || len > TERMINAL_MAXLEN ||
-      (len > 0 && !isValidAddr(sup, virtAddr + len - 1))) {
+  if (!isValidAddr(virtAddr) || len < 0 || len > TERMINAL_MAXLEN ||
+      (len > 0 && !isValidAddr(virtAddr + len - 1))) {
     programTrapHandler(sup);
   }
 
@@ -187,7 +188,7 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
     if ((status & TERMINT_STATUS_MASK) == CHAR_RECEIVED) {
       char c = (status >> BYTELEN) & TERMINT_STATUS_MASK;
       /* Validate each buffer address before writing */
-      if (!isValidAddr(sup, (memaddr)buffer)) {
+      if (!isValidAddr((memaddr)buffer)) {
         SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
         programTrapHandler(sup); /* Buffer overflow */
       }
