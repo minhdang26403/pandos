@@ -89,7 +89,7 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
 
   /* Send each character up to len */
   char *s = (char *)virtAddr;
-  int status = READY; /* Default for len = 0 */
+  int devStatus = READY; /* Default for len = 0 */
   int i;
   for (i = 0; i < len; i++) {
     /* Prepare data */
@@ -97,22 +97,23 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
 
     /* Disable interrupts to ensure writing the COMMAND field and executing SYS5
      * (WAITIO) happens atomically */
-    setSTATUS(status & ~STATUS_IEC);
+    unsigned int procStatus = getSTATUS();
+    setSTATUS(procStatus & ~STATUS_IEC);
     printer->d_command = PRINTCHR;
-    status = SYSCALL(WAITIO, PRNTINT, devNum, 0);
-    setSTATUS(status | STATUS_IEC); /* Reenable interrupts */
+    devStatus = SYSCALL(WAITIO, PRNTINT, devNum, 0);
+    setSTATUS(procStatus); /* Reenable interrupts */
 
-    if (status != READY) {
+    if (devStatus != READY) {
       break;
     }
   }
 
-  if (status == READY) {
+  if (devStatus == READY) {
     /* Success: all chars sent */
     excState->s_v0 = len;
   } else {
     /* Error: negative status */
-    excState->s_v0 = -status;
+    excState->s_v0 = -devStatus;
   }
 
   SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
@@ -137,27 +138,28 @@ HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
 
   /* Send each character up to len */
   char *s = (char *)virtAddr;
-  int status = CHAR_TRANSMITTED; /* Default for len = 0 */
+  int devStatus = CHAR_TRANSMITTED; /* Default for len = 0 */
   int i;
   for (i = 0; i < len; i++) {
     /* Disable interrupts to ensure writing the COMMAND field and executing SYS5
      * (WAITIO) happens atomically */
-    setSTATUS(status & ~STATUS_IEC);
+    unsigned int procStatus = getSTATUS();
+    setSTATUS(procStatus & ~STATUS_IEC);
     terminal->t_transm_command = TRANSMITCHAR | (s[i] << BYTELEN);
-    status = SYSCALL(WAITIO, TERMINT, devNum, FALSE);
-    setSTATUS(status | STATUS_IEC); /* Reenable interrupts */
+    devStatus = SYSCALL(WAITIO, TERMINT, devNum, FALSE);
+    setSTATUS(procStatus); /* Reenable interrupts */
 
-    if ((status & TERMINT_STATUS_MASK) != CHAR_TRANSMITTED) {
+    if ((devStatus & TERMINT_STATUS_MASK) != CHAR_TRANSMITTED) {
       break;
     }
   }
 
-  if ((status & TERMINT_STATUS_MASK) == CHAR_TRANSMITTED) {
+  if ((devStatus & TERMINT_STATUS_MASK) == CHAR_TRANSMITTED) {
     /* Success: all chars sent */
     excState->s_v0 = len;
   } else {
     /* Error: negative status */
-    excState->s_v0 = -status;
+    excState->s_v0 = -devStatus;
   }
 
   SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
@@ -175,18 +177,19 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
 
   /* Read each character up to len */
   char *buffer = (char *)virtAddr;
-  int status;
+  int devStatus;
 
   while (TRUE) {
     /* Disable interrupts to ensure writing the COMMAND field and executing SYS5
      * (WAITIO) happens atomically */
-    setSTATUS(status & ~STATUS_IEC);
+    unsigned int procStatus = getSTATUS();
+    setSTATUS(procStatus & ~STATUS_IEC);
     terminal->t_recv_command = RECEIVECHAR;
-    status = SYSCALL(WAITIO, TERMINT, devNum, TRUE);
-    setSTATUS(status | STATUS_IEC); /* Reenable interrupts */
+    devStatus = SYSCALL(WAITIO, TERMINT, devNum, TRUE);
+    setSTATUS(procStatus); /* Reenable interrupts */
 
-    if ((status & TERMINT_STATUS_MASK) == CHAR_RECEIVED) {
-      char c = (status >> BYTELEN) & TERMINT_STATUS_MASK;
+    if ((devStatus & TERMINT_STATUS_MASK) == CHAR_RECEIVED) {
+      char c = (devStatus >> BYTELEN) & TERMINT_STATUS_MASK;
       /* Validate each buffer address before writing */
       if (!isValidAddr((memaddr)buffer)) {
         SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
@@ -202,12 +205,12 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
     }
   }
 
-  if ((status & TERMINT_STATUS_MASK) == CHAR_RECEIVED) {
+  if ((devStatus & TERMINT_STATUS_MASK) == CHAR_RECEIVED) {
     /* Success: all chars read */
     excState->s_v0 = buffer - (char *)virtAddr;
   } else {
     /* Error: negative status */
-    excState->s_v0 = -status;
+    excState->s_v0 = -devStatus;
   }
 
   SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
