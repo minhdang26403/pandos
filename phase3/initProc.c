@@ -23,7 +23,7 @@ int supportDeviceSem[NUMDEVICES]; /* support level device semaphore */
 HIDDEN void initUProcState(state_t *state, int asid) {
   state->s_pc = state->s_t9 = UPROC_PC;
   state->s_sp = UPROC_SP;
-  state->s_status = STATUS_KUC | STATUS_IEP | STATUS_IM_ALL_ON | STATUS_TE;
+  state->s_status = STATUS_KUP | STATUS_IEP | STATUS_IM_ALL_ON | STATUS_TE;
   state->s_entryHI = asid << ASID_SHIFT;
 }
 
