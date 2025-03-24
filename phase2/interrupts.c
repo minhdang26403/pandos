@@ -232,7 +232,9 @@ void interruptHandler(state_t *savedExcState) {
     }
   }
 
-  /* Should never reach here; each handler should return via switchContext or
-   * scheduler */
-  PANIC();
+  if (currentProc == NULL) {
+    scheduler();
+  } else {
+    switchContext(savedExcState);
+  }
 }
