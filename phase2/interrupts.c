@@ -5,8 +5,7 @@
  * Description:
  *   This module implements the device interrupt handling routines for Phase 2.
  *   It processes both timer and non-timer interrupts by:
- *     - Handling Processor Local Timer (PLT) interrupts to preempt the running
- *       process.
+ *     - Handling Processor Local Timer (PLT) interrupts to preempt the running process.
  *     - Handling Interval Timer interrupts to unblock processes waiting on the
  *       pseudo-clock.
  *     - Handling device interrupts (including terminal devices) by acknowledging
@@ -57,14 +56,17 @@ HIDDEN void handleDeviceInterrupt(state_t *savedExcState, int lineNum,
   int devIdx = (lineNum - DISKINT) * DEVPERINT + devNum;
   device_t *devreg = &busRegArea->devreg[devIdx];
 
+  unsigned int transStatus = devreg->t_transm_status & TERMINT_STATUS_MASK;
+  unsigned int recvStatus = devreg->t_recv_status & TERMINT_STATUS_MASK;
+
   unsigned int statusCode;
   if (lineNum == TERMINT) {
-    if ((devreg->t_transm_status & TERMINT_STATUS_MASK) != BUSY) {
+    if (transStatus != BUSY && transStatus != READY) {
       /* Transmitter (write) - higher priority */
       statusCode = devreg->t_transm_status;
       devreg->t_transm_command = ACK; /* Ack transmit */
       /* devIdx maps to write semaphores (32-39) directly */
-    } else if ((devreg->t_recv_status & TERMINT_STATUS_MASK) != BUSY) {
+    } else if (recvStatus != BUSY && recvStatus != READY) {
       /* Receiver (read) */
       statusCode = devreg->t_recv_status;
       devreg->t_recv_command = ACK; /* Ack receive */
