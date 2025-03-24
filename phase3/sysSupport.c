@@ -169,11 +169,12 @@ HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
 HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
   memaddr virtAddr = excState->s_a1;
   int devNum = sup->sup_asid - 1; /* ASID 1-8 -> 0-7 */
-  int devIdx = (TERMINT - DISKINT) * DEVPERINT + devNum + DEVPERINT;
+  int devIdx = (TERMINT - DISKINT) * DEVPERINT + devNum;
+  int semIdx = devIdx + DEVPERINT;
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *terminal = &busRegArea->devreg[devIdx];
 
-  SYSCALL(PASSEREN, (int)&supportDeviceSem[devIdx], 0, 0);
+  SYSCALL(PASSEREN, (int)&supportDeviceSem[semIdx], 0, 0);
 
   /* Read each character up to len */
   char *buffer = (char *)virtAddr;
@@ -192,7 +193,7 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
       char c = (devStatus >> BYTELEN) & TERMINT_STATUS_MASK;
       /* Validate each buffer address before writing */
       if (!isValidAddr((memaddr)buffer)) {
-        SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
+        SYSCALL(VERHOGEN, (int)&supportDeviceSem[semIdx], 0, 0);
         programTrapHandler(sup); /* Buffer overflow */
       }
       *buffer = c;
@@ -213,7 +214,7 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
     excState->s_v0 = -devStatus;
   }
 
-  SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
+  SYSCALL(VERHOGEN, (int)&supportDeviceSem[semIdx], 0, 0);
   switchContext(excState);
 }
 
