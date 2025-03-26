@@ -51,13 +51,13 @@ HIDDEN void initSupportStruct(support_t *sup, int asid) {
   /* TLB exception context */
   context_t *excCtxTLB = &sup->sup_exceptContext[PGFAULTEXCEPT];
   excCtxTLB->c_pc = (memaddr)uTLB_ExceptionHandler;
-  excCtxTLB->c_status = STATUS_IEC | STATUS_IM_ALL_ON | STATUS_TE;
+  excCtxTLB->c_status = STATUS_IEP | STATUS_IM_ALL_ON | STATUS_TE;
   excCtxTLB->c_stackPtr = (memaddr)&sup->sup_stackTLB[499];
 
   /* General exception context */
   context_t *excCtxGen = &sup->sup_exceptContext[GENERALEXCEPT];
   excCtxGen->c_pc = (memaddr)supportExceptionHandler;
-  excCtxGen->c_status = STATUS_IEC | STATUS_IM_ALL_ON | STATUS_TE;
+  excCtxGen->c_status = STATUS_IEP | STATUS_IM_ALL_ON | STATUS_TE;
   excCtxGen->c_stackPtr = (memaddr)&sup->sup_stackGen[499];
 
   initPageTable(sup, asid);
