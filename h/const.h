@@ -205,7 +205,7 @@ For a 32-bit EntryLo, the format is:
 #define	WAITCLOCK		      7	  /* delay on the clock semaphore */
 #define	GETSUPPORTPTR     8	  /* return support structure ptr. */
 
-/* Support Level system code codes */
+/* Support Level system call codes */
 #define TERMINATE         9   /* Terminate U-proc */
 #define GETTOD           10   /* Get Time of Day */
 #define WRITEPRINTER     11   /* Write to Printer */

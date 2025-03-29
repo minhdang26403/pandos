@@ -132,7 +132,7 @@ void uTLB_ExceptionHandler() {
 
   /* 5. Get missing page number (p) from EntryHi */
   unsigned int vpn = (savedExcState->s_entryHI & VPN_MASK) >> VPN_SHIFT;
-  int pageIdx = (vpn == VPN_STACK) ? MAXPAGES - 1 : vpn - VPN_TEXT_BASE;
+  int pageIdx = (vpn == VPN_STACK) ? STACKPAGE : vpn - VPN_TEXT_BASE;
 
   /* 6. Pick a frame (i) - FIFO (Section 4.5.4) */
   int frameIdx = nextFrameIdx;
@@ -173,7 +173,7 @@ void uTLB_ExceptionHandler() {
     /* 8.(c). Write to old process's backing store */
     memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
     int oldPageIdx =
-        (oldVpn == VPN_STACK) ? MAXPAGES - 1 : oldVpn - VPN_TEXT_BASE;
+        (oldVpn == VPN_STACK) ? STACKPAGE : oldVpn - VPN_TEXT_BASE;
     if (writeFlashPage(oldAsid, oldPageIdx, frameAddr) < 0) {
       SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
       programTrapHandler(sup); /* I/O error as trap */
@@ -201,13 +201,12 @@ void uTLB_ExceptionHandler() {
   /* 12. Update TLB (atomic with 11) */
   setENTRYHI(pte->pte_entryHI);
   TLBP();
+  setENTRYLO(pte->pte_entryLO);
   if (!(getINDEX() & TLB_PRESENT)) {
     /* P=0: Match found */
-    setENTRYLO(pte->pte_entryLO);
     TLBWI();
   } else {
     /* P=1: No match, add new entry */
-    setENTRYLO(pte->pte_entryLO);
     TLBWR(); /* Random slot */
   }
   setSTATUS(status); /* Reenable interrupts */

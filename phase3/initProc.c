@@ -31,7 +31,7 @@ HIDDEN void initUProcState(state_t *state, int asid) {
 HIDDEN void initPageTable(support_t *sup, int asid) {
   /* Initialize the first 31 entries (text and data pages) */
   int i;
-  for (i = 0; i < MAXPAGES - 1; i++) {
+  for (i = 0; i < STACKPAGE; i++) {
     sup->sup_privatePgTbl[i].pte_entryHI =
         ((VPN_TEXT_BASE + i) << VPN_SHIFT) | (asid << ASID_SHIFT);
     sup->sup_privatePgTbl[i].pte_entryLO = PTE_DIRTY;
