@@ -29,12 +29,27 @@ HIDDEN void initUProcState(state_t *state, int asid) {
 
 /* Helper function to initialize a Page Table for a U-proc */
 HIDDEN void initPageTable(support_t *sup, int asid) {
+  char headerBuf[PAGESIZE];
+
+  /* Read the header from flash (block 0) into headerBuf */
+  if (readFlashPage(asid, 0, (memaddr)headerBuf) < 0) {
+    /* If reading the header fails, treat it as a program trap */
+    programTrapHandler(sup);
+  }
+
+  /* Extract the .text memory size from the header. The header field for .text Memory Size is at offset 0x000C. */
+  unsigned int textMemSize = *(unsigned int *)(headerBuf + 0x000C);
+
+  /* Compute the number of pages required for the .text section. Rounding up if necessary */
+  int textPages = (textMemSize + PAGESIZE - 1) / PAGESIZE;
+
   /* Initialize the first 31 entries (text and data pages) */
   int i;
   for (i = 0; i < MAXPAGES - 1; i++) {
     sup->sup_privatePgTbl[i].pte_entryHI =
         ((VPN_TEXT_BASE + i) << VPN_SHIFT) | (asid << ASID_SHIFT);
-    sup->sup_privatePgTbl[i].pte_entryLO = PTE_DIRTY;
+    /* Set D=0 for .text pages, D=1 for others */
+    sup->sup_privatePgTbl[i].pte_entryLO = (i < textPages) ? 0 : PTE_DIRTY;
   }
 
   /* Initialize the stack page (entry 31) */
