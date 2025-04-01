@@ -18,5 +18,6 @@ extern int swapPoolSem;
 
 void initSwapStructs();
 void uTLB_ExceptionHandler();
+int readFlashPage(int asid, int blockNum, memaddr dest);
 
 #endif

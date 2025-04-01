@@ -50,7 +50,7 @@ void initSwapStructs() {
 }
 
 /* Read 4 KB page from flash to RAM */
-static int readFlashPage(int asid, int blockNum, memaddr dest) {
+int readFlashPage(int asid, int blockNum, memaddr dest) {
   /* Map ASID to flash device (1-8 -> 0-7) */
   int devNum = asid - 1;
   int devIdx = (FLASHINT - DISKINT) * DEVPERINT + devNum;
