@@ -498,15 +498,7 @@ void uTLB_RefillHandler() {
   unsigned int vpn = (entryHI & VPN_MASK) >> VPN_SHIFT;
 
   /* Determine the page table index for the missing entry */
-  unsigned int pageIdx;
-  if (vpn == VPN_STACK) {
-    pageIdx = STACKPAGE; /* Stack page (31) */
-  } else if (vpn >= VPN_TEXT_BASE && vpn < VPN_TEXT_BASE + TEXT_PAGE_COUNT) {
-    pageIdx = vpn - VPN_TEXT_BASE; /* .text/.data pages (0-30) */
-  } else {
-    /* If the VPN is out of the expected range, panic */
-    PANIC();
-  }
+  unsigned int pageIdx = vpn % MAXPAGES;
 
   /* Get Page Table entry */
   support_t *sup = currentProc->p_supportStruct;
