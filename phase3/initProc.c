@@ -19,10 +19,6 @@
 int masterSemaphore;              /* Master semaphore for termination */
 int supportDeviceSem[NUMDEVICES]; /* support level device semaphore */
 
-void debug(int a, int b, int c, int d) {
-
-}
-
 /* Initialize a U-proc's processor state */
 HIDDEN void initUProcState(state_t *state, int asid) {
   state->s_pc = state->s_t9 = UPROC_PC;
