@@ -500,7 +500,7 @@ void uTLB_RefillHandler() {
   /* Determine the page table index for the missing entry */
   unsigned int pageIdx;
   if (vpn == VPN_STACK) {
-    pageIdx = MAXPAGES - 1; /* Stack page (31) */
+    pageIdx = STACKPAGE; /* Stack page (31) */
   } else if (vpn >= VPN_TEXT_BASE && vpn < VPN_TEXT_BASE + TEXT_PAGE_COUNT) {
     pageIdx = vpn - VPN_TEXT_BASE; /* .text/.data pages (0-30) */
   } else {
