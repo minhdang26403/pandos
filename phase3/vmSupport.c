@@ -27,7 +27,7 @@ spte_t swapPoolTable[SWAP_POOL_SIZE]; /* Swap Pool table */
 int swapPoolSem;                      /* Swap Pool semaphore: mutex */
 
 /* Module-wide variables */
-HIDDEN int nextFrameIdx = 0; /* FIFO index for page replacement (4.5.4) */
+HIDDEN int nextFrameIdx = 0; /* FIFO index as fallback, not default, page replacement policy */
 
 /*
  * initSwapStructs
@@ -134,9 +134,20 @@ void uTLB_ExceptionHandler() {
   unsigned int vpn = (savedExcState->s_entryHI & VPN_MASK) >> VPN_SHIFT;
   int pageIdx = (vpn == VPN_STACK) ? MAXPAGES - 1 : vpn - VPN_TEXT_BASE;
 
-  /* 6. Pick a frame (i) - FIFO (Section 4.5.4) */
-  int frameIdx = nextFrameIdx;
-  nextFrameIdx = (nextFrameIdx + 1) % SWAP_POOL_SIZE; /* Round-robin */
+  /* 6. Pick a frame (i): first search for an unoccupied frame */
+  int frameIdx = -1;
+  int i;
+  for (i = 0; i < SWAP_POOL_SIZE; i++) {
+    if (swapPoolTable[i].spte_asid == ASID_UNOCCUPIED) {
+      frameIdx = i;
+      break;
+    }
+  }
+  /* If no free frame is found, fall back to FIFO (round-robin) */
+  if (frameIdx == -1) {
+    frameIdx = nextFrameIdx;
+    nextFrameIdx = (nextFrameIdx + 1) % SWAP_POOL_SIZE;
+  }
 
   /* 7 & 8. Check if frame i is occupied */
   if (swapPoolTable[frameIdx].spte_asid != ASID_UNOCCUPIED) {
