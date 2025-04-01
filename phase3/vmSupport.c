@@ -132,7 +132,7 @@ void uTLB_ExceptionHandler() {
 
   /* 5. Get missing page number (p) from EntryHi */
   unsigned int vpn = (savedExcState->s_entryHI & VPN_MASK) >> VPN_SHIFT;
-  int pageIdx = vpn % MAXPAGES;
+  int pageIdx = (vpn == VPN_STACK) ? STACKPAGE : vpn - VPN_TEXT_BASE;
 
   /* 6. Pick a frame (i): first search for an unoccupied frame */
   int frameIdx = -1;
@@ -183,7 +183,8 @@ void uTLB_ExceptionHandler() {
 
     /* 8.(c). Write to old process's backing store */
     memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
-    int oldPageIdx = oldVpn % MAXPAGES;
+    int oldPageIdx =
+        (oldVpn == VPN_STACK) ? STACKPAGE : oldVpn - VPN_TEXT_BASE;
     if (writeFlashPage(oldAsid, oldPageIdx, frameAddr) < 0) {
       SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
       programTrapHandler(sup); /* I/O error as trap */
