@@ -69,17 +69,24 @@ HIDDEN void initSupportStruct(support_t *sup, int asid) {
   /* Set ASID for the process */
   sup->sup_asid = asid;
 
+  /* Determine RAMTOP */
+  devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
+  memaddr RAMTOP = RAMSTART + busRegArea->ramsize;
+
+  /* Avoiding the last frame: Reserve the last frame below RAMTOP for the test process */
+  memaddr SUPPORT_STACK_BASE = RAMTOP - (asid * PAGESIZE * 2);
+
   /* TLB exception context */
   context_t *excCtxTLB = &sup->sup_exceptContext[PGFAULTEXCEPT];
   excCtxTLB->c_pc = (memaddr)uTLB_ExceptionHandler;
   excCtxTLB->c_status = STATUS_IEP | STATUS_IM_ALL_ON | STATUS_TE;
-  excCtxTLB->c_stackPtr = (memaddr)&sup->sup_stackTLB[499];
+  excCtxTLB->c_stackPtr = SUPPORT_STACK_BASE;
 
   /* General exception context */
   context_t *excCtxGen = &sup->sup_exceptContext[GENERALEXCEPT];
   excCtxGen->c_pc = (memaddr)supportExceptionHandler;
   excCtxGen->c_status = STATUS_IEP | STATUS_IM_ALL_ON | STATUS_TE;
-  excCtxGen->c_stackPtr = (memaddr)&sup->sup_stackGen[499];
+  excCtxGen->c_stackPtr = SUPPORT_STACK_BASE + PAGESIZE;
 
   initPageTable(sup, asid);
 }
