@@ -19,6 +19,10 @@
 int masterSemaphore;              /* Master semaphore for termination */
 int supportDeviceSem[NUMDEVICES]; /* support level device semaphore */
 
+void debug(int a, int b, int c, int d) {
+
+}
+
 /* Initialize a U-proc's processor state */
 HIDDEN void initUProcState(state_t *state, int asid) {
   state->s_pc = state->s_t9 = UPROC_PC;
@@ -44,12 +48,18 @@ HIDDEN void initPageTable(support_t *sup, int asid) {
   int textPages = (textMemSize + PAGESIZE - 1) / PAGESIZE;
 
   /* Initialize the first 31 entries (text and data pages) */
+  /* Turn off dirty bit for .text pages and turn on for others */
   int i;
-  for (i = 0; i < STACKPAGE; i++) {
+  for (i = 0; i < textPages; i++) {
     sup->sup_privatePgTbl[i].pte_entryHI =
         ((VPN_TEXT_BASE + i) << VPN_SHIFT) | (asid << ASID_SHIFT);
-    /* Set D=0 for .text pages, D=1 for others */
-    sup->sup_privatePgTbl[i].pte_entryLO = (i < textPages) ? 0 : PTE_DIRTY;
+    sup->sup_privatePgTbl[i].pte_entryLO = ZERO_MASK;
+  }
+
+  for (; i < STACKPAGE; i++) {
+    sup->sup_privatePgTbl[i].pte_entryHI =
+        ((VPN_TEXT_BASE + i) << VPN_SHIFT) | (asid << ASID_SHIFT);
+    sup->sup_privatePgTbl[i].pte_entryLO = PTE_DIRTY;
   }
 
   /* Initialize the stack page (entry 31) */
