@@ -118,7 +118,11 @@ void test() {
     initUProcState(&uProcState, asid);
     support_t *sup = &uProcSupport[asid - 1];
     initSupportStruct(sup, asid);
-    SYSCALL(CREATEPROCESS, (int)&uProcState, (int)sup, 0);
+    int status = SYSCALL(CREATEPROCESS, (int)&uProcState, (int)sup, 0);
+    if (status != OK) {
+      /* Error creating u-procs, terminate the current process */
+      SYSCALL(TERMINATEPROCESS, 0, 0, 0); /* Triggers HALT */ 
+    }
   }
 
   /* Wait for all U-procs to terminate */

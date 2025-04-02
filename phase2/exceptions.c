@@ -75,7 +75,7 @@ HIDDEN void sysCreateProc(state_t *savedExcState) {
 
   if (p == NULL) {
     /* No more free pcb's */
-    savedExcState->s_v0 = -1;
+    savedExcState->s_v0 = ERR;
   } else {
     /* Successfully create a new process */
     state_t *statep = (state_t *)savedExcState->s_a1;
@@ -91,7 +91,7 @@ HIDDEN void sysCreateProc(state_t *savedExcState) {
     insertProcQ(&readyQueue, p);
     insertChild(currentProc, p);
     procCnt++;
-    savedExcState->s_v0 = 0;
+    savedExcState->s_v0 = OK;
   }
 
   switchContext(savedExcState);

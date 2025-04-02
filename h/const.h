@@ -61,6 +61,9 @@
 #define HIDDEN			  static
 #define EOS				    '\0'
 
+#define OK            0
+#define ERR           -1
+
 #define NULL 			    ((void *)0xFFFFFFFF)
 
 /* device interrupts */
