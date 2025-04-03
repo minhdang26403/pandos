@@ -23,8 +23,6 @@
 
 /* Module-wide variables */
 HIDDEN memaddr swapPool; /* RAM frames set aside to support virtual memory */
-HIDDEN int nextFrameIdx; /* FIFO index as a fallback (not default) page
-                            replacement policy */
 
 /*
  * initSwapStructs
@@ -42,8 +40,9 @@ void initSwapStructs() {
     swapPoolTable[i].spte_pte = NULL;
   }
 
-  swapPoolSem = 1;  /* Initialize Swap Pool semaphore to 1 (mutex) */
-  nextFrameIdx = 0; /* Start at frame 0 */
+  /* Initialize Swap Pool semaphore to 1, providing mutual exclusion for the
+   * swapPoolTable */
+  swapPoolSem = 1;
 }
 
 /* Read 4 KB page from flash to RAM */
@@ -110,6 +109,27 @@ int writeFlashPage(int asid, int blockNum, memaddr src) {
   return 0;
 }
 
+HIDDEN int allocateFrame() {
+  /* FIFO index as a fallback (not default) page replacement policy. Note that
+   * this assignment is called once (the first time this function is called) */
+  static int nextFrameIdx = 0;
+
+  /* First search for an unoccupied frame */
+  int frameIdx;
+  for (frameIdx = 0; frameIdx < SWAP_POOL_SIZE; frameIdx++) {
+    if (swapPoolTable[frameIdx].spte_asid == ASID_UNOCCUPIED) {
+      break;
+    }
+  }
+  /* If no free frame is found, fall back to FIFO (round-robin) */
+  if (frameIdx == SWAP_POOL_SIZE) {
+    frameIdx = nextFrameIdx;
+    nextFrameIdx = (nextFrameIdx + 1) % SWAP_POOL_SIZE;
+  }
+
+  return frameIdx;
+}
+
 /* TLB exception handler (Pager) */
 void uTLB_ExceptionHandler() {
   /* 1. Get Support Structure via SYS8 */
@@ -131,20 +151,8 @@ void uTLB_ExceptionHandler() {
   unsigned int vpn = (savedExcState->s_entryHI & VPN_MASK) >> VPN_SHIFT;
   int pageIdx = vpn % MAXPAGES;
 
-  /* 6. Pick a frame (i): first search for an unoccupied frame */
-  int frameIdx = -1;
-  int i;
-  for (i = 0; i < SWAP_POOL_SIZE; i++) {
-    if (swapPoolTable[i].spte_asid == ASID_UNOCCUPIED) {
-      frameIdx = i;
-      break;
-    }
-  }
-  /* If no free frame is found, fall back to FIFO (round-robin) */
-  if (frameIdx == -1) {
-    frameIdx = nextFrameIdx;
-    nextFrameIdx = (nextFrameIdx + 1) % SWAP_POOL_SIZE;
-  }
+  /* 6. Pick a frame (i) */
+  int frameIdx = allocateFrame();
 
   /* 7 & 8. Check if frame i is occupied */
   if (swapPoolTable[frameIdx].spte_asid != ASID_UNOCCUPIED) {
