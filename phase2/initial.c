@@ -30,6 +30,9 @@
 /* Test function of phase 2 */
 extern void test();
 
+/* Init function of phase 3 */
+extern void init();
+
 /* 1. Define Nucleus's global variables */
 int procCnt;      /* The number of started, but not yet terminated processes */
 int softBlockCnt; /* The number of started, but not terminated processes that
@@ -109,9 +112,9 @@ void main() {
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   p->p_s.s_sp = RAMSTART + busRegArea->ramsize;
 
-  /* Set PC to jump to the test function of p2test.c */
-  p->p_s.s_pc = (memaddr)test;
-  p->p_s.s_t9 = (memaddr)test; /* This register must get the same value as
+  /* Set PC to jump to the init function of initProc.c */
+  p->p_s.s_pc = (memaddr)init;
+  p->p_s.s_t9 = (memaddr)init; /* This register must get the same value as
                                  PC whenever PC is assigned a new value */
 
   /* 7. Call the scheduler */

@@ -102,7 +102,7 @@ HIDDEN void initSupportStruct(support_t *sup, int asid) {
 
 /* The instantiator process. Note that the Nucleus (Level 3/Phase 2) has an
  * external reference to this function */
-void test() {
+void init() {
   int i;
 
   /* Initialize the Swap Pool table and Swap Pool semaphore */
