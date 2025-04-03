@@ -11,9 +11,9 @@
 #include "../h/initProc.h"
 
 #include "../h/exceptions.h"
+#include "../h/supportAlloc.h"
 #include "../h/sysSupport.h"
 #include "../h/vmSupport.h"
-#include "../h/supportAlloc.h"
 #include "umps3/umps/libumps.h"
 
 /* Support Level's global variables */
@@ -120,13 +120,13 @@ void test() {
     support_t *sup = supportAlloc();
     if (sup == NULL) {
       /* Error: no support structure available */
-      PANIC(); 
+      SYSCALL(TERMINATEPROCESS, 0, 0, 0);
     }
     initSupportStruct(sup, asid);
     int status = SYSCALL(CREATEPROCESS, (int)&uProcState, (int)sup, 0);
     if (status != OK) {
       /* Error creating u-procs, terminate the current process */
-      SYSCALL(TERMINATEPROCESS, 0, 0, 0); /* Triggers HALT */ 
+      SYSCALL(TERMINATEPROCESS, 0, 0, 0);
     }
   }
 
