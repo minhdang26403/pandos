@@ -18,6 +18,7 @@
 #include "../h/scheduler.h"
 #include "../h/types.h"
 #include "../h/vmSupport.h"
+#include "../h/supportAlloc.h"
 #include "umps3/umps/libumps.h"
 
 HIDDEN void syscallHandler(support_t *sup);
@@ -61,6 +62,9 @@ HIDDEN void sysTerminate(support_t *sup) {
 
   /* Signal termination to test */
   SYSCALL(VERHOGEN, (int)&masterSemaphore, 0, 0);
+
+  /* Return the support structure to the free list */
+  supportDeallocate(sup);
 
   /* Terminate the process */
   SYSCALL(TERMINATEPROCESS, 0, 0, 0);
