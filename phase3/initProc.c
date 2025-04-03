@@ -13,6 +13,7 @@
 #include "../h/exceptions.h"
 #include "../h/sysSupport.h"
 #include "../h/vmSupport.h"
+#include "../h/supportAlloc.h"
 #include "umps3/umps/libumps.h"
 
 /* Support Level's global variables */
@@ -108,15 +109,19 @@ void test() {
     supportDeviceSem[i] = 1;
   }
 
-  /* Storage for U-procs' support structures */
-  static support_t uProcSupport[MAX_UPROCS];
+  /* Initialize the free list of Support Structures */
+  initSupportFreeList();
 
   /* Launch U-procs */
   int asid;
   for (asid = 1; asid <= MAX_UPROCS; asid++) {
     state_t uProcState;
     initUProcState(&uProcState, asid);
-    support_t *sup = &uProcSupport[asid - 1];
+    support_t *sup = supportAlloc();
+    if (sup == NULL) {
+      /* Error: no support structure available */
+      PANIC(); 
+    }
     initSupportStruct(sup, asid);
     int status = SYSCALL(CREATEPROCESS, (int)&uProcState, (int)sup, 0);
     if (status != OK) {
