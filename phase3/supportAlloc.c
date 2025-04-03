@@ -11,6 +11,19 @@
 HIDDEN support_t *supportFreeList[MAX_UPROCS];
 HIDDEN int supportFreeListTop;
 
+
+/*
+ * Return a pointer to a Support Structure from the free list.
+ * Returns NULL if none are available.
+ */
+support_t *supportAlloc() {
+  if (supportFreeListTop < 0) {
+    return NULL;
+  }
+  return supportFreeList[supportFreeListTop--];
+}
+
+
 /*
  * Return a Support Structure to the free list.
  */
@@ -31,15 +44,4 @@ void initSupportFreeList() {
   for (i = 0; i < MAX_UPROCS; i++) {
     supportDeallocate(&uProcSupport[i]);
   }
-}
-
-/*
- * Return a pointer to a Support Structure from the free list.
- * Returns NULL if none are available.
- */
-support_t *supportAlloc() {
-  if (supportFreeListTop < 0) {
-    return NULL;
-  }
-  return supportFreeList[supportFreeListTop--];
 }

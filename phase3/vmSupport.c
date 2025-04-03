@@ -21,13 +21,10 @@
 #include "../h/types.h"
 #include "umps3/umps/libumps.h"
 
-/* Global variables */
-memaddr swapPool; /* RAM frames set aside to support virtual memory */
-spte_t swapPoolTable[SWAP_POOL_SIZE]; /* Swap Pool table */
-int swapPoolSem;                      /* Swap Pool semaphore: mutex */
-
 /* Module-wide variables */
-HIDDEN int nextFrameIdx = 0; /* FIFO index as fallback, not default, page replacement policy */
+HIDDEN memaddr swapPool; /* RAM frames set aside to support virtual memory */
+HIDDEN int nextFrameIdx; /* FIFO index as a fallback (not default) page
+                            replacement policy */
 
 /*
  * initSwapStructs
@@ -82,7 +79,7 @@ int readFlashPage(int asid, int blockNum, memaddr dest) {
 }
 
 /* Write 4 KB page from RAM to flash */
-static int writeFlashPage(int asid, int blockNum, memaddr src) {
+int writeFlashPage(int asid, int blockNum, memaddr src) {
   /* Map ASID to flash device (1-8 -> 0-7) */
   int devNum = asid - 1;
   int devIdx = (FLASHINT - DISKINT) * DEVPERINT + devNum;

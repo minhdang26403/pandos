@@ -14,4 +14,7 @@
 extern int masterSemaphore;
 extern int supportDeviceSem[NUMDEVICES];
 
+extern spte_t swapPoolTable[SWAP_POOL_SIZE];
+extern int swapPoolSem;
+
 #endif

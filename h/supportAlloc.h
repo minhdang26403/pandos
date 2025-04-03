@@ -3,8 +3,8 @@
 
 #include "types.h"
 
-void initSupportFreeList();
 support_t *supportAlloc();
-void supportDeallocate(support_t *);
+void supportDeallocate(support_t *sup);
+void initSupportFreeList();
 
 #endif

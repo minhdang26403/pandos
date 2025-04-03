@@ -9,15 +9,12 @@
  *  Written by Dang Truong
  */
 
-#include "../h/types.h"
 #include "../h/const.h"
-
-extern memaddr swapPool;
-extern spte_t swapPoolTable[SWAP_POOL_SIZE];
-extern int swapPoolSem;
+#include "../h/types.h"
 
 void initSwapStructs();
-void uTLB_ExceptionHandler();
 int readFlashPage(int asid, int blockNum, memaddr dest);
+int writeFlashPage(int asid, int blockNum, memaddr src);
+void uTLB_ExceptionHandler();
 
 #endif
