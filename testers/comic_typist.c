@@ -11,7 +11,7 @@
  * This tests terminal I/O (SYS12, SYS13), printer output (SYS11), and process
  * termination (SYS9).
  *
- * Written by: Dang Truong
+ * Written by Dang Truong
  */
 
 /* Constants */

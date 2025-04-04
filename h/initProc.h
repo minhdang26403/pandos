@@ -3,7 +3,7 @@
 
 /************************** INITPROC.H ******************************
  *
- *  The externals declaration file for the Support Level Module.
+ *  The externals declaration file for the Process Initialization Module.
  *
  *  Written by Dang Truong
  */

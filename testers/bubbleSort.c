@@ -16,6 +16,7 @@
  *  - Prints a success message if the arrays match, or an error message otherwise.
  *  - Terminates the process using a SYS call.
  * 
+ * Written by Loc Pham
  */
 
 #define SIZE 500

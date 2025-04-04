@@ -1,6 +1,6 @@
 /************************** SYSSUPPORT.C ******************************
  *
- * Purpose: Implements the Support Level’s exception handling services,
+ * Purpose: Implements the Support Level's exception handling services,
  *          including the general exception handler (Section 4.6), the SYSCALL
  *          exception handler (Section 4.7), and the Program Trap exception
  *          handler (Section 4.8). These handlers dispatch system calls and
@@ -68,7 +68,7 @@ void supportExceptionHandler() {
  *    - sup: Pointer to the support structure of the U-proc to be terminated.
  */
 HIDDEN void sysTerminate(support_t *sup) {
-  /* Gain a mutual exclusion on Swap Pool */
+  /* Gain a mutual exclusion on Swap Pool Table */
   SYSCALL(PASSEREN, (int)&swapPoolSem, 0, 0);
 
   /* Free frames occupied by this U-proc */

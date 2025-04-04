@@ -22,7 +22,7 @@ int masterSemaphore;              /* Master semaphore for termination */
 int supportDeviceSem[NUMDEVICES]; /* support level device semaphore */
 
 /* These variables need to be declared globally since TERMINATE syscall (in
- * sysSupport.c) needs to invalidate frames of terminated u-procs */
+ * sysSupport.c) needs to invalidate frames of terminated u-procs (optimization) */
 spte_t swapPoolTable[SWAP_POOL_SIZE]; /* Swap Pool table */
 int swapPoolSem;                      /* Swap Pool semaphore: mutex */
 

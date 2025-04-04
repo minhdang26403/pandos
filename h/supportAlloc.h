@@ -3,7 +3,7 @@
 
 /************************** SUPPORTALLOC.H ******************************
  *
- *  The externals declaration file for the Support Level Module.
+ *  The externals declaration file for the Support Structure Allocation module.
  *
  *  Written by Dang Truong
  */

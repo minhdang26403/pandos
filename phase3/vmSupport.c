@@ -73,14 +73,12 @@ int readFlashPage(int asid, int blockNum, memaddr dest) {
   /* 2. Set DMA address */
   flash->d_data0 = dest;
 
-  /* 3. Set block number and command (atomic with SYS5) */
+  /* 3. Set block number and command */
   unsigned int command = (blockNum << 8) | FLASH_READBLK;
   flash->d_command = command;
 
   /* 4. Wait for I/O completion */
   int status = SYSCALL(WAITIO, FLASHINT, devNum, 0);
-  /* TODO: do we need to mask status with `FLASH_STATUS_MASK` as for terminal
-   * devices? */
   if (status != READY) {
     SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
     return -1; /* Error */
@@ -116,14 +114,12 @@ int writeFlashPage(int asid, int blockNum, memaddr src) {
   /* 2. Set DMA address */
   flash->d_data0 = src;
 
-  /* 3. Set block number and command (atomic with SYS5) */
+  /* 3. Set block number and command */
   unsigned int command = (blockNum << 8) | FLASH_WRITEBLK;
   flash->d_command = command;
 
   /* 4. Wait for I/O completion */
   int status = SYSCALL(WAITIO, FLASHINT, devNum, 0);
-  /* TODO: do we need to mask status with `FLASH_STATUS_MASK` as for terminal
-   * devices? */
   if (status != READY) {
     SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
     return -1; /* Error */
@@ -135,14 +131,14 @@ int writeFlashPage(int asid, int blockNum, memaddr src) {
 }
 
 /*
- * Function: allocateFrame
- * Purpose: Allocates a frame from the Swap Pool for paging. It first searches for an unoccupied
+ * Function: chooseFrame
+ * Purpose: Chooses a frame from the Swap Pool for paging. It first searches for an unoccupied
  *          frame; if none is available, it uses a FIFO (round-robin) algorithm as a fallback.
  * Parameters: None.
  * Returns:
  *    - The index of the allocated frame within the Swap Pool.
  */
-HIDDEN int allocateFrame() {
+HIDDEN int chooseFrame() {
   /* FIFO index as a fallback (not default) page replacement policy. Note that
    * this assignment is called once (the first time this function is called) */
   static int nextFrameIdx = 0;
@@ -182,7 +178,7 @@ void uTLB_ExceptionHandler() {
   /* 1. Get Support Structure via SYS8 */
   support_t *sup = (support_t *)SYSCALL(GETSUPPORTPTR, 0, 0, 0);
 
-  /* 2. Determine cause from sup_exceptState[0] */
+  /* 2. Determine cause from sup_exceptState[PGFAULTEXCEPT] */
   state_t *savedExcState = &sup->sup_exceptState[PGFAULTEXCEPT];
   unsigned int excCode = CAUSE_EXCCODE(savedExcState->s_cause);
 
@@ -199,7 +195,7 @@ void uTLB_ExceptionHandler() {
   int pageIdx = vpn % MAXPAGES;
 
   /* 6. Pick a frame (i) */
-  int frameIdx = allocateFrame();
+  int frameIdx = chooseFrame();
 
   /* 7 & 8. Check if frame i is occupied */
   if (swapPoolTable[frameIdx].spte_asid != ASID_UNOCCUPIED) {
