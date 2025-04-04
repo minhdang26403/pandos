@@ -437,7 +437,7 @@ HIDDEN void syscallHandler(state_t *savedExcState) {
     } else {
       /* If previous mode was kernel mode (KUP = 0), handle the syscall */
 
-      savedExcState->s_pc += 4; /* control of the current process should be
+      savedExcState->s_pc += WORDLEN; /* control of the current process should be
                                    returned to the next instruction */
       syscalls[num](savedExcState);
     }

@@ -74,7 +74,7 @@ HIDDEN void sysTerminate(support_t *sup) {
   int i;
   for (i = 0; i < SWAP_POOL_SIZE; i++) {
     if (swapPoolTable[i].spte_asid == asid) {
-      swapPoolTable[i].spte_asid = -1;
+      swapPoolTable[i].spte_asid = ASID_UNOCCUPIED;
       swapPoolTable[i].spte_vpn = 0;
       swapPoolTable[i].spte_pte = NULL;
     }
