@@ -1,14 +1,13 @@
 /************************** VMSUPPORT.C ******************************
  *
- * This module implements the TLB exception handler (The Pager). Since reading
- * and writing to each U-proc's flash device is limited to supporting paging,
- * this module should also contain the function(s) for reading and writing flash
- * devices.
+ * Purpose: Implements the Support Level's virtual memory support routines,
+ *          including the TLB exception handler (Pager) and the functions for
+ *          reading from and writing to flash devices. This module also manages
+ *          the Swap Pool data structures used for paging.
  *
- * Written by Dang Truong
- */
-
-/***************************************************************/
+ * Written by Dang Truong, Loc Pham
+ *
+ ***************************************************************/
 
 #include "../h/vmSupport.h"
 
@@ -25,8 +24,12 @@
 HIDDEN memaddr swapPool; /* RAM frames set aside to support virtual memory */
 
 /*
- * initSwapStructs
- * Initialize the Swap Pool data structures
+ * Function: initSwapStructs
+ * Purpose: Initialize the Swap Pool data structures. This includes setting the starting
+ *          address for the Swap Pool, initializing each entry in the Swap Pool table to
+ *          indicate that it is unoccupied, and setting the Swap Pool semaphore for mutual
+ *          exclusion.
+ * Parameters: None.
  */
 void initSwapStructs() {
   /* Place the Swap Pool after the end of the operating system code */
@@ -45,7 +48,18 @@ void initSwapStructs() {
   swapPoolSem = 1;
 }
 
-/* Read 4 KB page from flash to RAM */
+/*
+ * Function: readFlashPage
+ * Purpose: Reads a 4 KB page from the flash device into RAM. This function maps the U-proc's
+ *          ASID to the appropriate flash device, locks the device register, sets the DMA address,
+ *          issues the read command, waits for I/O completion, and then unlocks the device.
+ * Parameters:
+ *    - asid: The ASID of the U-proc whose flash device will be used.
+ *    - blockNum: The block number (flash block) to read from.
+ *    - dest: The destination address in RAM where the page will be loaded.
+ * Returns:
+ *    - 0 on success, or -1 if an error occurs during the read operation.
+ */
 int readFlashPage(int asid, int blockNum, memaddr dest) {
   /* Map ASID to flash device (1-8 -> 0-7) */
   int devNum = asid - 1;
@@ -77,7 +91,18 @@ int readFlashPage(int asid, int blockNum, memaddr dest) {
   return 0;
 }
 
-/* Write 4 KB page from RAM to flash */
+/*
+ * Function: writeFlashPage
+ * Purpose: Writes a 4 KB page from RAM to the flash device. This function maps the U-proc's
+ *          ASID to the correct flash device, locks the device register, sets the DMA address,
+ *          issues the write command, waits for I/O completion, and then unlocks the device.
+ * Parameters:
+ *    - asid: The ASID of the U-proc whose flash device will be used.
+ *    - blockNum: The block number (flash block) to write to.
+ *    - src: The source address in RAM where the page to be written is located.
+ * Returns:
+ *    - 0 on success, or -1 if an error occurs during the write operation.
+ */
 int writeFlashPage(int asid, int blockNum, memaddr src) {
   /* Map ASID to flash device (1-8 -> 0-7) */
   int devNum = asid - 1;
@@ -109,6 +134,14 @@ int writeFlashPage(int asid, int blockNum, memaddr src) {
   return 0;
 }
 
+/*
+ * Function: allocateFrame
+ * Purpose: Allocates a frame from the Swap Pool for paging. It first searches for an unoccupied
+ *          frame; if none is available, it uses a FIFO (round-robin) algorithm as a fallback.
+ * Parameters: None.
+ * Returns:
+ *    - The index of the allocated frame within the Swap Pool.
+ */
 HIDDEN int allocateFrame() {
   /* FIFO index as a fallback (not default) page replacement policy. Note that
    * this assignment is called once (the first time this function is called) */
@@ -130,7 +163,21 @@ HIDDEN int allocateFrame() {
   return frameIdx;
 }
 
-/* TLB exception handler (Pager) */
+/*
+ * Function: uTLB_ExceptionHandler
+ * Purpose: Implements the TLB exception handler (Pager) for the Support Level. This routine:
+ *          1. Retrieves the current U-proc's support structure.
+ *          2. Determines the cause of the TLB exception.
+ *          3. If the exception is a TLB-Modification, it invokes the program trap handler.
+ *          4. Locks the Swap Pool and identifies the missing page from the faulting address.
+ *          5. Allocates a frame, and if the frame is already occupied, swaps out the old page:
+ *             - Updates the old process’s page table and TLB.
+ *             - Writes the old page to the backing store.
+ *          6. Reads the required page from the backing store into the allocated frame.
+ *          7. Updates the Swap Pool table, the U-proc’s page table, and the TLB atomically.
+ *          8. Unlocks the Swap Pool and restarts the faulting process.
+ * Parameters: None.
+ */
 void uTLB_ExceptionHandler() {
   /* 1. Get Support Structure via SYS8 */
   support_t *sup = (support_t *)SYSCALL(GETSUPPORTPTR, 0, 0, 0);

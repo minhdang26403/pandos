@@ -1,14 +1,14 @@
 /************************** SYSSUPPORT.C ******************************
  *
- * This module implements the Support Level's:
- *  - general exception handler (section 4.6)
- *  - SYSCALL exception handler (section 4.7)
- *  - Program Trap exception handler (section 4.8)
+ * Purpose: Implements the Support Level’s exception handling services,
+ *          including the general exception handler (Section 4.6), the SYSCALL
+ *          exception handler (Section 4.7), and the Program Trap exception
+ *          handler (Section 4.8). These handlers dispatch system calls and
+ *          manage process termination and I/O operations for U-procs.
  *
- * Written by Dang Truong
- */
-
-/***************************************************************/
+ * Written by Dang Truong, Loc Pham
+ *
+ ***************************************************************/
 
 #include "../h/sysSupport.h"
 
@@ -24,12 +24,26 @@
 HIDDEN void syscallHandler(support_t *sup);
 void programTrapHandler(support_t *sup);
 
-/* Validate virtual address is in U-proc's logical space (KUSEG) */
+/*
+ * Function: isValidAddr
+ * Purpose: Validate that a given memory address is within the U-proc's logical
+ *          address space (KUSEG). Returns non-zero if valid; zero otherwise.
+ * Parameters:
+ *    - addr: The memory address to validate.
+ */
 HIDDEN int isValidAddr(memaddr addr) {
   return addr >= KUSEG && addr <= MAXADDR;
 }
 
-/* Support Level General Exception Handler */
+/*
+ * Function: supportExceptionHandler
+ * Purpose: Acts as the Support Level's General Exception Handler. It retrieves the
+ *          current support structure, examines the exception cause, and dispatches
+ *          the exception to the appropriate handler. SYSCALL exceptions are handled
+ *          by syscallHandler, while all other exceptions (including TLB modifications)
+ *          are treated as program traps.
+ * Parameters: None.
+ */
 void supportExceptionHandler() {
   support_t *sup = (support_t *)SYSCALL(GETSUPPORTPTR, 0, 0, 0);
   unsigned int excCode =
@@ -43,6 +57,16 @@ void supportExceptionHandler() {
   }
 }
 
+/*
+ * Function: sysTerminate
+ * Purpose: Terminates the current U-proc by releasing its resources. This includes
+ *          obtaining mutual exclusion on the Swap Pool, freeing frames allocated to
+ *          the process, signaling termination to the instantiator (test process), and
+ *          returning the support structure to the free list before finally invoking the
+ *          TERMINATEPROCESS syscall.
+ * Parameters:
+ *    - sup: Pointer to the support structure of the U-proc to be terminated.
+ */
 HIDDEN void sysTerminate(support_t *sup) {
   /* Gain a mutual exclusion on Swap Pool */
   SYSCALL(PASSEREN, (int)&swapPoolSem, 0, 0);
@@ -70,11 +94,28 @@ HIDDEN void sysTerminate(support_t *sup) {
   SYSCALL(TERMINATEPROCESS, 0, 0, 0);
 }
 
+/*
+ * Function: sysGetTOD
+ * Purpose: Implements the GETTOD service by storing the system's time-of-day in the
+ *          v0 register of the exception state and switching context back to the U-proc.
+ * Parameters:
+ *    - excState: Pointer to the state_t structure (exception state) for the current U-proc.
+ */
 HIDDEN void sysGetTOD(state_t *excState) {
   STCK(excState->s_v0);
   switchContext(excState);
 }
 
+/*
+ * Function: sysWriteToPrinter
+ * Purpose: Implements the WRITEPRINTER service. This function validates that the entire
+ *          string to be printed lies within the U-proc's logical address space, then sends
+ *          each character to the printer device. The function waits for the printer to be
+ *          ready and returns the number of characters transmitted, or a negative error code.
+ * Parameters:
+ *    - excState: Pointer to the state_t structure containing the exception state for the U-proc.
+ *    - sup:      Pointer to the support structure for the U-proc.
+ */
 HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
   memaddr virtAddr = excState->s_a1;
   int len = excState->s_a2;
@@ -124,6 +165,15 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
   switchContext(excState);
 }
 
+/*
+ * Function: sysWriteToTerminal
+ * Purpose: Implements the WRITETERMINAL service. This function validates that the string to be
+ *          written is entirely within the U-proc's logical space, sends each character to the
+ *          terminal device, and returns the number of characters transmitted or an error code.
+ * Parameters:
+ *    - excState: Pointer to the state_t structure containing the U-proc's exception state.
+ *    - sup:      Pointer to the support structure for the U-proc.
+ */
 HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
   memaddr virtAddr = excState->s_a1;
   int len = excState->s_a2;
@@ -170,6 +220,15 @@ HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
   switchContext(excState);
 }
 
+/*
+ * Function: sysReadFromTerminal
+ * Purpose: Implements the READTERMINAL service. This function reads characters from the terminal
+ *          device into a user buffer until a newline is encountered. It validates that the buffer
+ *          addresses fall within KUSEG and returns the number of characters read or an error code.
+ * Parameters:
+ *    - excState: Pointer to the state_t structure containing the U-proc's exception state.
+ *    - sup:      Pointer to the support structure for the U-proc.
+ */
 HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
   memaddr virtAddr = excState->s_a1;
   int devNum = sup->sup_asid - 1; /* ASID 1-8 -> 0-7 */
@@ -222,7 +281,16 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
   switchContext(excState);
 }
 
-/* System Call Exception Handler */
+/*
+ * Function: syscallHandler
+ * Purpose: Dispatches SYSCALL exceptions (for syscall numbers 9 through 13) for the Support
+ *          Level. It increments the program counter to skip the SYSCALL instruction and then
+ *          calls the appropriate service routine (TERMINATE, GETTOD, WRITEPRINTER, WRITETERMINAL,
+ *          or READTERMINAL). If the syscall number is not within the valid range, it calls
+ *          programTrapHandler.
+ * Parameters:
+ *    - sup: Pointer to the support structure for the current U-proc.
+ */
 HIDDEN void syscallHandler(support_t *sup) {
   state_t *excState = &sup->sup_exceptState[GENERALEXCEPT];
   int syscallNum = excState->s_a0;
@@ -254,5 +322,12 @@ HIDDEN void syscallHandler(support_t *sup) {
   }
 }
 
-/* Program Trap Exception Handler */
+/*
+ * Function: programTrapHandler
+ * Purpose: Implements the Program Trap exception handler by invoking sysTerminate.
+ *          This function handles any program traps or invalid operations by terminating the
+ *          current U-proc.
+ * Parameters:
+ *    - sup: Pointer to the support structure for the U-proc encountering the trap.
+ */
 void programTrapHandler(support_t *sup) { sysTerminate(sup); }

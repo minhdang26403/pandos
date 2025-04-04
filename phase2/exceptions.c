@@ -488,7 +488,20 @@ void generalExceptionHandler() {
   }
 }
 
-/* TLB-Refill handler: Level 3, kernel-mode, interrupts disabled */
+/**
+ * Function: uTLB_RefillHandler
+ * ---------------------------------
+ * Purpose: Implements the TLB refill handler (Phase 2 version). When a TLB miss occurs,
+ *          this function retrieves the saved exception state from the BIOS Data Page,
+ *          extracts the Virtual Page Number (VPN) from the EntryHi field, computes the
+ *          corresponding page table index, and writes the appropriate page table entry
+ *          into the TLB using the TLBWR instruction. If the current U-proc's support
+ *          structure is NULL, it terminates the process using sysTerminateProc. Finally,
+ *          control is returned to the process to retry the instruction.
+ *
+ * Parameters:
+ *   None.
+ */
 void uTLB_RefillHandler() {
   /* Get saved exception state from BIOS Data Page */
   state_t *savedExcState = (state_t *)BIOSDATAPAGE;
