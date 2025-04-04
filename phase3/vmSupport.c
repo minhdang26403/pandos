@@ -74,19 +74,19 @@ int readFlashPage(int asid, int blockNum, memaddr dest) {
   flash->d_data0 = dest;
 
   /* 3. Set block number and command */
-  unsigned int command = (blockNum << 8) | FLASH_READBLK;
+  unsigned int command = (blockNum << BYTELEN) | FLASH_READBLK;
   flash->d_command = command;
 
   /* 4. Wait for I/O completion */
   int status = SYSCALL(WAITIO, FLASHINT, devNum, 0);
   if (status != READY) {
     SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
-    return -1; /* Error */
+    return ERR;
   }
 
   /* 5. Unlock device register */
   SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
-  return 0;
+  return OK;
 }
 
 /*
@@ -115,19 +115,19 @@ int writeFlashPage(int asid, int blockNum, memaddr src) {
   flash->d_data0 = src;
 
   /* 3. Set block number and command */
-  unsigned int command = (blockNum << 8) | FLASH_WRITEBLK;
+  unsigned int command = (blockNum << BYTELEN) | FLASH_WRITEBLK;
   flash->d_command = command;
 
   /* 4. Wait for I/O completion */
   int status = SYSCALL(WAITIO, FLASHINT, devNum, 0);
   if (status != READY) {
     SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
-    return -1; /* Error */
+    return ERR;
   }
 
   /* 5. Unlock device register */
   SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
-  return 0;
+  return OK;
 }
 
 /*
@@ -232,7 +232,7 @@ void uTLB_ExceptionHandler() {
     /* 8.(c). Write to old process's backing store */
     memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
     int oldPageIdx = oldVpn % MAXPAGES;
-    if (writeFlashPage(oldAsid, oldPageIdx, frameAddr) < 0) {
+    if (writeFlashPage(oldAsid, oldPageIdx, frameAddr) == ERR) {
       SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
       programTrapHandler(sup); /* I/O error as trap */
     }
@@ -240,7 +240,7 @@ void uTLB_ExceptionHandler() {
 
   /* 9. Read current process's page p into frame i */
   memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
-  if (readFlashPage(sup->sup_asid, pageIdx, frameAddr) < 0) {
+  if (readFlashPage(sup->sup_asid, pageIdx, frameAddr) == ERR) {
     SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
     programTrapHandler(sup); /* I/O error as trap */
   }
