@@ -1,12 +1,13 @@
 /************************** INITPROC.C ******************************
  *
- * This module implements `test` and exports the Support Level's global
- * variables (e.g. device semaphores (4.9), and optionally a masterSemaphore)
+ * Purpose: Implements the instantiator process for the Support Level (Phase 3)
+ *          by initializing global support-level data structures (such as device semaphores,
+ *          swap pool table, and support structure free list), setting up U-proc processor
+ *          state and page tables, and launching U-procs via the CREATEPROCESS syscall.
  *
- * Written by Dang Truong
- */
-
-/***************************************************************/
+ * Written by Dang Truong, Loc Pham
+ *
+ ***************************************************************/
 
 #include "../h/initProc.h"
 
@@ -25,7 +26,16 @@ int supportDeviceSem[NUMDEVICES]; /* support level device semaphore */
 spte_t swapPoolTable[SWAP_POOL_SIZE]; /* Swap Pool table */
 int swapPoolSem;                      /* Swap Pool semaphore: mutex */
 
-/* Initialize a U-proc's processor state */
+/*
+ * Function: initUProcState
+ * Purpose: Initialize a U-proc's processor state so that it is ready for execution.
+ *          This function sets the program counter (PC), the stack pointer (SP),
+ *          the processor status (to user mode with interrupts enabled), and the
+ *          EntryHi field with the ASID.
+ * Parameters:
+ *    - state: Pointer to the state_t structure representing the U-proc's processor state.
+ *    - asid:  The Address Space Identifier for the U-proc.
+ */
 HIDDEN void initUProcState(state_t *state, int asid) {
   state->s_pc = state->s_t9 = UPROC_PC;
   state->s_sp = UPROC_SP;
@@ -33,7 +43,15 @@ HIDDEN void initUProcState(state_t *state, int asid) {
   state->s_entryHI = asid << ASID_SHIFT;
 }
 
-/* Helper function to initialize a Page Table for a U-proc */
+/*
+ * Function: initPageTable
+ * Purpose: Initialize the U-proc's page table by reading its executable header from flash,
+ *          determining the .text memory size, and setting up page table entries for the text,
+ *          data, and stack pages according to the Pandos specifications.
+ * Parameters:
+ *    - sup: Pointer to the support_t structure which contains the U-proc's page table.
+ *    - asid: The Address Space Identifier for the U-proc.
+ */
 HIDDEN void initPageTable(support_t *sup, int asid) {
   char headerBuf[PAGESIZE];
 
@@ -72,7 +90,15 @@ HIDDEN void initPageTable(support_t *sup, int asid) {
   sup->sup_privatePgTbl[STACKPAGE].pte_entryLO = PTE_DIRTY;
 }
 
-/* Initialize a Support Structure */
+/*
+ * Function: initSupportStruct
+ * Purpose: Initialize the support structure for a U-proc by setting its ASID, configuring the
+ *          exception contexts for TLB and general exceptions (using designated stack areas), and
+ *          initializing its page table.
+ * Parameters:
+ *    - sup: Pointer to the support_t structure for the U-proc.
+ *    - asid: The Address Space Identifier for the U-proc.
+ */
 HIDDEN void initSupportStruct(support_t *sup, int asid) {
   /* Set ASID for the process */
   sup->sup_asid = asid;
@@ -100,8 +126,16 @@ HIDDEN void initSupportStruct(support_t *sup, int asid) {
   initPageTable(sup, asid);
 }
 
-/* The instantiator process. Note that the Nucleus (Level 3/Phase 2) has an
- * external reference to this function */
+/*
+ * Function: init
+ * Purpose: Acts as the instantiator process for the Support Level. This function
+ *          initializes global data structures (Swap Pool table, device semaphores, and support
+ *          structure free list), creates and launches U-procs by initializing their processor state
+ *          and support structures, and waits for all U-procs to terminate before gracefully
+ *          terminating the process (triggering HALT). Note that the Nucleus (Level 3/Phase 2) has an
+ *          external reference to this function.
+ * Parameters: None.
+ */
 void init() {
   int i;
 

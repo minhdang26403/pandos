@@ -2,6 +2,22 @@
 #include "h/tconst.h"
 #include "h/print.h"
 
+/**
+ * User program to test the bubble sort algorithm.
+ *
+ * This module implements a bubble sort algorithm to sort an array of SIZE (500) 
+ * numbers in ascending order. The unsorted array is initialized in reverse order 
+ * (largest to smallest), and an expected array in sorted order (0 to SIZE-1) is hardcoded.
+ *
+ * The program performs the following steps:
+ *  - Initializes an unsorted array and a corresponding expected sorted array.
+ *  - Calls the bubbleSort() function to sort the unsorted array.
+ *  - Compares the sorted array with the expected array.
+ *  - Prints a success message if the arrays match, or an error message otherwise.
+ *  - Terminates the process using a SYS call.
+ * 
+ */
+
 #define SIZE 500
 
 void bubbleSort(int arr[], int size) {
