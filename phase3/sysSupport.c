@@ -16,9 +16,9 @@
 #include "../h/initProc.h"
 #include "../h/initial.h"
 #include "../h/scheduler.h"
+#include "../h/supportAlloc.h"
 #include "../h/types.h"
 #include "../h/vmSupport.h"
-#include "../h/supportAlloc.h"
 #include "umps3/umps/libumps.h"
 
 HIDDEN void syscallHandler(support_t *sup);
@@ -31,9 +31,7 @@ void programTrapHandler(support_t *sup);
  * Parameters:
  *    - addr: The memory address to validate.
  */
-HIDDEN int isValidAddr(memaddr addr) {
-  return addr >= KUSEG && addr <= MAXADDR;
-}
+HIDDEN int isValidAddr(memaddr addr) { return addr >= KUSEG; }
 
 /*
  * Function: supportExceptionHandler
@@ -118,15 +116,18 @@ HIDDEN void sysGetTOD(state_t *excState) {
  */
 HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
   memaddr virtAddr = excState->s_a1;
-  int len = excState->s_a2;
+  /* if len < 0, then len will be a very large number due to overflow */
+  unsigned int len = excState->s_a2;
   int devNum = sup->sup_asid - 1; /* ASID 1-8 -> 0-7 */
   int devIdx = (PRNTINT - DISKINT) * DEVPERINT + devNum;
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *printer = &busRegArea->devreg[devIdx];
 
-  /* Validate inputs: entire string must be in KUSEG */
-  if (!isValidAddr(virtAddr) || len < 0 || len > PRINTER_MAXLEN ||
-      (len > 0 && !isValidAddr(virtAddr + len - 1))) {
+  /* Validate inputs: entire string must be in KUSEG
+   * Note that if (virtAddr + len - 1) >= MAXADDR, then the number will be
+   * wrapped around and smaller than KUSEG */
+  if (!isValidAddr(virtAddr) || len > PRINTER_MAXLEN ||
+      !isValidAddr(virtAddr + len - 1)) {
     programTrapHandler(sup);
   }
 
@@ -135,7 +136,7 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
   /* Send each character up to len */
   char *s = (char *)virtAddr;
   int devStatus = READY; /* Default for len = 0 */
-  int i;
+  unsigned i;
   for (i = 0; i < len; i++) {
     /* Prepare data */
     printer->d_data0 = s[i];
@@ -176,15 +177,15 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
  */
 HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
   memaddr virtAddr = excState->s_a1;
-  int len = excState->s_a2;
+  unsigned len = excState->s_a2;
   int devNum = sup->sup_asid - 1; /* ASID 1-8 -> 0-7 */
   int devIdx = (TERMINT - DISKINT) * DEVPERINT + devNum;
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *terminal = &busRegArea->devreg[devIdx];
 
   /* Validate inputs: entire string must be in KUSEG */
-  if (!isValidAddr(virtAddr) || len < 0 || len > TERMINAL_MAXLEN ||
-      (len > 0 && !isValidAddr(virtAddr + len - 1))) {
+  if (!isValidAddr(virtAddr) || len > TERMINAL_MAXLEN ||
+      !isValidAddr(virtAddr + len - 1)) {
     programTrapHandler(sup);
   }
 
@@ -193,7 +194,7 @@ HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
   /* Send each character up to len */
   char *s = (char *)virtAddr;
   int devStatus = CHAR_TRANSMITTED; /* Default for len = 0 */
-  int i;
+  unsigned i;
   for (i = 0; i < len; i++) {
     /* Disable interrupts to ensure writing the COMMAND field and executing SYS5
      * (WAITIO) happens atomically */
