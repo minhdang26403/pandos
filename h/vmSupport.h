@@ -13,9 +13,6 @@
 #include "../h/types.h"
 
 void initSwapStructs();
-int isValidAddr(memaddr addr);
-int readFlashPage(int asid, int blockNum, memaddr dest);
-int writeFlashPage(int asid, int blockNum, memaddr src);
 void uTLB_ExceptionHandler();
 
 #endif

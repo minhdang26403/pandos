@@ -12,6 +12,7 @@
 #include "../h/vmSupport.h"
 
 #include "../h/const.h"
+#include "../h/deviceSupportDMA.h"
 #include "../h/exceptions.h"
 #include "../h/initProc.h"
 #include "../h/initial.h"
@@ -46,97 +47,6 @@ void initSwapStructs() {
   /* Initialize Swap Pool semaphore to 1, providing mutual exclusion for the
    * swapPoolTable */
   swapPoolSem = 1;
-}
-
-/*
- * Function: isValidAddr
- * Purpose: Validate that a given memory address is within the U-proc's logical
- *          address space (KUSEG). Returns non-zero if valid; zero otherwise.
- * Parameters:
- *    - addr: The memory address to validate.
- */
-int isValidAddr(memaddr addr) { return addr >= KUSEG; }
-
-/*
- * Function: readFlashPage
- * Purpose: Reads a 4 KB page from the flash device into RAM. This function maps the U-proc's
- *          ASID to the appropriate flash device, locks the device register, sets the DMA address,
- *          issues the read command, waits for I/O completion, and then unlocks the device.
- * Parameters:
- *    - asid: The ASID of the U-proc whose flash device will be used.
- *    - blockNum: The block number (flash block) to read from.
- *    - dest: The destination address in RAM where the page will be loaded.
- * Returns:
- *    - 0 on success, or -1 if an error occurs during the read operation.
- */
-int readFlashPage(int asid, int blockNum, memaddr dest) {
-  /* Map ASID to flash device (1-8 -> 0-7) */
-  int devNum = asid - 1;
-  int devIdx = (FLASHINT - DISKINT) * DEVPERINT + devNum;
-  devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
-  device_t *flash = &busRegArea->devreg[devIdx];
-
-  /* 1. Lock device register */
-  SYSCALL(PASSEREN, (int)&supportDeviceSem[devNum], 0, 0);
-
-  /* 2. Set DMA address */
-  flash->d_data0 = dest;
-
-  /* 3. Set block number and command */
-  unsigned int command = (blockNum << BYTELEN) | FLASH_READBLK;
-  flash->d_command = command;
-
-  /* 4. Wait for I/O completion */
-  int status = SYSCALL(WAITIO, FLASHINT, devNum, 0);
-  if (status != READY) {
-    SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
-    return ERR;
-  }
-
-  /* 5. Unlock device register */
-  SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
-  return OK;
-}
-
-/*
- * Function: writeFlashPage
- * Purpose: Writes a 4 KB page from RAM to the flash device. This function maps the U-proc's
- *          ASID to the correct flash device, locks the device register, sets the DMA address,
- *          issues the write command, waits for I/O completion, and then unlocks the device.
- * Parameters:
- *    - asid: The ASID of the U-proc whose flash device will be used.
- *    - blockNum: The block number (flash block) to write to.
- *    - src: The source address in RAM where the page to be written is located.
- * Returns:
- *    - 0 on success, or -1 if an error occurs during the write operation.
- */
-int writeFlashPage(int asid, int blockNum, memaddr src) {
-  /* Map ASID to flash device (1-8 -> 0-7) */
-  int devNum = asid - 1;
-  int devIdx = (FLASHINT - DISKINT) * DEVPERINT + devNum;
-  devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
-  device_t *flash = &busRegArea->devreg[devIdx];
-
-  /* 1. Lock device register */
-  SYSCALL(PASSEREN, (int)&supportDeviceSem[devNum], 0, 0);
-
-  /* 2. Set DMA address */
-  flash->d_data0 = src;
-
-  /* 3. Set block number and command */
-  unsigned int command = (blockNum << BYTELEN) | FLASH_WRITEBLK;
-  flash->d_command = command;
-
-  /* 4. Wait for I/O completion */
-  int status = SYSCALL(WAITIO, FLASHINT, devNum, 0);
-  if (status != READY) {
-    SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
-    return ERR;
-  }
-
-  /* 5. Unlock device register */
-  SYSCALL(VERHOGEN, (int)&supportDeviceSem[devNum], 0, 0);
-  return OK;
 }
 
 /*
@@ -241,7 +151,7 @@ void uTLB_ExceptionHandler() {
     /* 8.(c). Write to old process's backing store */
     memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
     int oldPageIdx = oldVpn % MAXPAGES;
-    if (writeFlashPage(oldAsid, oldPageIdx, frameAddr) == ERR) {
+    if (writeFlashPage(oldAsid - 1, oldPageIdx, frameAddr) <= 0) {
       SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
       programTrapHandler(sup); /* I/O error as trap */
     }
@@ -249,7 +159,7 @@ void uTLB_ExceptionHandler() {
 
   /* 9. Read current process's page p into frame i */
   memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
-  if (readFlashPage(sup->sup_asid, pageIdx, frameAddr) == ERR) {
+  if (readFlashPage(sup->sup_asid - 1, pageIdx, frameAddr) <= 0) {
     SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
     programTrapHandler(sup); /* I/O error as trap */
   }
