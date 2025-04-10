@@ -111,6 +111,25 @@
 #define RESET			    0
 #define ACK				    1
 
+/* Disk Geometry Parsing from DATA1 Register */
+#define DISK_CYLINDER_MASK     0xFFFF0000
+#define DISK_CYLINDER_SHIFT    16
+
+#define DISK_HEAD_MASK         0x0000FF00
+#define DISK_HEAD_SHIFT        8
+
+#define DISK_SECTOR_MASK       0x000000FF
+#define DISK_SECTOR_SHIFT      0
+
+/* Helper macros to extract values */
+#define GET_DISK_CYLINDER(data1)  (((data1) & DISK_CYLINDER_MASK) >> DISK_CYLINDER_SHIFT)
+#define GET_DISK_HEAD(data1)      (((data1) & DISK_HEAD_MASK) >> DISK_HEAD_SHIFT)
+#define GET_DISK_SECTOR(data1)    (((data1) & DISK_SECTOR_MASK) >> DISK_SECTOR_SHIFT)
+
+#define SEEKCYL             2
+#define DISK_READBLK        3
+#define DISK_WRITEBLK       4
+
 /* Flash COMMAND codes */
 #define FLASH_READBLK       2
 #define FLASH_WRITEBLK      3
@@ -150,8 +169,10 @@
 #define UPROC_PC        0x800000B0                  /* .text start */
 #define UPROC_SP        0xC0000000                  /* RAM top */
 
-#define SWAP_POOL_SIZE  (2 * MAX_UPROCS)              /* Size of the Swap Pool */
-#define SWAP_POOL_BASE  (RAMSTART + 32 * PAGESIZE)  /* Starting address of the Swap Pool */
+#define DISK_DMA_BASE   (RAMSTART + 32 * PAGESIZE)      /* Starting physical address of DMA buffers for disk device */
+#define FLASH_DMA_BASE  (DISK_DMA_BASE + 8 * PAGESIZE)  /* Starting physical address of DMA buffers for flash device */
+#define SWAP_POOL_BASE  (FLASH_DMA_BASE + 8 * PAGESIZE) /* Starting physical address of the Swap Pool */
+#define SWAP_POOL_SIZE  (2 * MAX_UPROCS)                /* Size of the Swap Pool */
 
 #define ASID_UNOCCUPIED -1                          /* Marker for free Swap Pool frame */
 #define ASID_SHIFT      6
@@ -214,6 +235,8 @@ For a 32-bit EntryLo, the format is:
 #define WRITEPRINTER     11   /* Write to Printer */
 #define WRITETERMINAL    12   /* Write to Terminal */
 #define READTERMINAL     13   /* Read from Terminal */
+#define DISKPUT          14   /* Write to Disk */
+#define DISKGET          15   /* Read from Disk */
 
 /* Device-specific constants */
 #define PRINTER_MAXLEN   128  /* Max length for SYS11 */

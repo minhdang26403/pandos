@@ -13,6 +13,7 @@
 #include "../h/sysSupport.h"
 
 #include "../h/const.h"
+#include "../h/deviceSupportDMA.h"
 #include "../h/initProc.h"
 #include "../h/initial.h"
 #include "../h/scheduler.h"
@@ -23,15 +24,6 @@
 
 HIDDEN void syscallHandler(support_t *sup);
 void programTrapHandler(support_t *sup);
-
-/*
- * Function: isValidAddr
- * Purpose: Validate that a given memory address is within the U-proc's logical
- *          address space (KUSEG). Returns non-zero if valid; zero otherwise.
- * Parameters:
- *    - addr: The memory address to validate.
- */
-HIDDEN int isValidAddr(memaddr addr) { return addr >= KUSEG; }
 
 /*
  * Function: supportExceptionHandler
@@ -315,6 +307,10 @@ HIDDEN void syscallHandler(support_t *sup) {
       case READTERMINAL:
         sysReadFromTerminal(excState, sup);
         break;
+      case DISKPUT:
+        sysDiskPut(excState, sup);
+      case DISKGET:
+        sysDiskGet(excState, sup);
       default:
         break;
     }

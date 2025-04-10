@@ -49,6 +49,15 @@ void initSwapStructs() {
 }
 
 /*
+ * Function: isValidAddr
+ * Purpose: Validate that a given memory address is within the U-proc's logical
+ *          address space (KUSEG). Returns non-zero if valid; zero otherwise.
+ * Parameters:
+ *    - addr: The memory address to validate.
+ */
+int isValidAddr(memaddr addr) { return addr >= KUSEG; }
+
+/*
  * Function: readFlashPage
  * Purpose: Reads a 4 KB page from the flash device into RAM. This function maps the U-proc's
  *          ASID to the appropriate flash device, locks the device register, sets the DMA address,
