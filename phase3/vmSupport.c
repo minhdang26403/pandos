@@ -50,6 +50,15 @@ void initSwapStructs() {
 }
 
 /*
+ * Function: isValidAddr
+ * Purpose: Validate that a given memory address is within the U-proc's logical
+ *          address space (KUSEG). Returns non-zero if valid; zero otherwise.
+ * Parameters:
+ *    - addr: The memory address to validate.
+ */
+int isValidAddr(memaddr addr) { return addr >= KUSEG; }
+
+/*
  * Function: chooseFrame
  * Purpose: Chooses a frame from the Swap Pool for paging. It first searches for an unoccupied
  *          frame; if none is available, it uses a FIFO (round-robin) algorithm as a fallback.

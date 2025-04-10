@@ -13,6 +13,7 @@
 #include "../h/types.h"
 
 void initSwapStructs();
+int isValidAddr(memaddr addr);
 void uTLB_ExceptionHandler();
 
 #endif

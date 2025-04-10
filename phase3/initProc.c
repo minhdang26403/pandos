@@ -11,6 +11,7 @@
 
 #include "../h/initProc.h"
 
+#include "../h/deviceSupportDMA.h"
 #include "../h/exceptions.h"
 #include "../h/supportAlloc.h"
 #include "../h/sysSupport.h"
@@ -56,7 +57,7 @@ HIDDEN void initPageTable(support_t *sup, int asid) {
   char headerBuf[PAGESIZE];
 
   /* Read the header from flash (block 0) into headerBuf */
-  if (readFlashPage(asid, 0, (memaddr)headerBuf) == ERR) {
+  if (readFlashPage(asid - 1, 0, (memaddr)headerBuf) == ERR) {
     /* If reading the header fails, treat it as a program trap */
     programTrapHandler(sup);
   }

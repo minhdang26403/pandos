@@ -6,15 +6,6 @@
 #include "../h/vmSupport.h"
 #include "umps3/umps/libumps.h"
 
-/*
- * Function: isValidAddr
- * Purpose: Validate that a given memory address is within the U-proc's logical
- *          address space (KUSEG). Returns non-zero if valid; zero otherwise.
- * Parameters:
- *    - addr: The memory address to validate.
- */
-HIDDEN int isValidAddr(memaddr addr) { return addr >= KUSEG; }
-
 /* Validate arguments to SYS16 and SYS17 (flash number, user address, and block
  * number) */
 HIDDEN void validateFlashSyscallArgs(memaddr logicalAddr, int flashNum,
