@@ -307,10 +307,10 @@ HIDDEN void syscallHandler(support_t *sup) {
       case READTERMINAL:
         sysReadFromTerminal(excState, sup);
         break;
-      case DISKPUT:
-        sysDiskPut(excState, sup);
-      case DISKGET:
-        sysDiskGet(excState, sup);
+      case DISKWRITE:
+        sysDiskWrite(excState, sup);
+      case DISKREAD:
+        sysDiskRead(excState, sup);
       default:
         break;
     }

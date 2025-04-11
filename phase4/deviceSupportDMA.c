@@ -43,147 +43,105 @@ HIDDEN void memcopy(void *dest, const void *src, unsigned int size) {
   }
 }
 
-/* SYS14: Write 4KB from user space to a sector on disk */
-void sysDiskPut(state_t *excState, support_t *sup) {
+HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
   memaddr logicalAddr = excState->s_a1;
-  int diskNo = excState->s_a2;
-  int sectorNo = excState->s_a3;
+  unsigned int diskNum = excState->s_a2;
+  unsigned int sectorNum = excState->s_a3;
 
-  /* 1. Validate disk number is in [0..7] */
-  if (diskNo < 0 || diskNo >= DEVPERINT) {
-    programTrapHandler(sup);
-  }
-
-  /* 2. Validate logical address lies entirely within KUSEG */
+  /* Validate logical address lies entirely within KUSEG */
   if (!isValidAddr(logicalAddr) || !isValidAddr(logicalAddr + PAGESIZE - 1)) {
     programTrapHandler(sup);
   }
 
-  /* 3. Compute physical DMA buffer address for this disk */
-  memaddr dmaBuf = DISK_DMA_BASE + diskNo * PAGESIZE;
-
-  /* 4. Read disk geometry from DATA1 and validate sector number */
-  devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
-  device_t *disk =
-      &busRegArea->devreg[(DISKINT - DISKINT) * DEVPERINT + diskNo];
-
-  unsigned int data1 = disk->d_data1;
-  int maxCyl = GET_DISK_CYLINDER(data1);
-  int maxHead = GET_DISK_HEAD(data1);
-  int maxSect = GET_DISK_SECTOR(data1);
-  int maxSector = maxCyl * maxHead * maxSect;
-
-  if (sectorNo < 0 || sectorNo >= maxSector) {
+  /*
+   * Validate disk number: must be in [1..7]
+   * Note: diskNum is unsigned, so negative diskNum value is wrapped around to a
+   * very large integer. Disk 0 is reserved for the backing store.
+   */
+  if (diskNum == 0 || diskNum >= DEVPERINT) {
     programTrapHandler(sup);
   }
 
-  /* 5. Copy one page from user space to kernel DMA buffer */
-  memcopy((void *)dmaBuf, (void *)logicalAddr, PAGESIZE);
+  /* Read disk geometry from DATA1 and validate sector number */
+  unsigned int devIdx = (DISKINT - DISKINT) * DEVPERINT + diskNum;
+  devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
+  device_t *disk = &busRegArea->devreg[devIdx];
 
-  /* 6. Lock disk device semaphore to ensure exclusive access */
-  SYSCALL(PASSEREN, (int)&supportDeviceSem[diskNo], 0, 0);
+  unsigned int data1 = disk->d_data1;
+  unsigned int maxCyl = GET_DISK_CYLINDER(data1);
+  unsigned int maxHead = GET_DISK_HEAD(data1);
+  unsigned int maxSect = GET_DISK_SECTOR(data1);
+  unsigned int maxSector = maxCyl * maxHead * maxSect;
 
-  /* 7. Translate sector number to (cylinder, head, sector) */
-  int cyl = sectorNo / (maxHead * maxSect);
-  int rem = sectorNo % (maxHead * maxSect);
-  int head = rem / maxSect;
-  int sect = rem % maxSect;
+  if (sectorNum >= maxSector) {
+    programTrapHandler(sup);
+  }
 
-  /* 8. Issue SEEK command with interrupts disabled */
+  /* Translate sector number to (cylinder, head, sector) */
+  unsigned int cyl = sectorNum / (maxHead * maxSect);
+  unsigned int rem = sectorNum % (maxHead * maxSect);
+  unsigned int head = rem / maxSect;
+  unsigned int sect = rem % maxSect;
+
+  /* Compute physical DMA buffer address for this disk */
+  memaddr dmaBuf = DISK_DMA_BASE + diskNum * PAGESIZE;
+
+  /* Gain exclusive access to the device and DMA buffer */
+  SYSCALL(PASSEREN, (int)&supportDeviceSem[devIdx], 0, 0);
+
+  if (op == DISK_WRITEBLK) {
+    /* For disk write operations, copy data from user space to DMA buffer */
+    memcopy((void *)dmaBuf, (void *)logicalAddr, PAGESIZE);
+  }
+
+  /* Issue SEEK to position disk head at the correct cylinder */
   unsigned int status = getSTATUS();
   setSTATUS(status & ~STATUS_IEC);
-  disk->d_command = (cyl << BYTELEN) | SEEKCYL;
-  SYSCALL(WAITIO, DISKINT, diskNo, 0);
+  disk->d_command = (cyl << DISK_CYL_SHIFT) | SEEKCYL;
+  int result = SYSCALL(WAITIO, DISKINT, diskNum, 0);
   setSTATUS(status);
 
-  /* 9. Set DMA address in device register */
+  if (result != READY) {
+    /* Abort on SEEK failure */
+    SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
+    excState->s_v0 = -result;
+    switchContext(excState);
+  }
+
+  /* Set DMA buffer address */
   disk->d_data0 = dmaBuf;
 
-  /* 10. Issue WRITEBLK command with interrupts disabled */
+  /* Issue READ or WRITE command */
   setSTATUS(status & ~STATUS_IEC);
-  disk->d_command = (head << BYTELEN) | sect | DISK_WRITEBLK;
-  int result = SYSCALL(WAITIO, DISKINT, diskNo, 0);
+  disk->d_command = (head << DISK_HEAD_SHIFT) | (sect << DISK_SECT_SHIFT) | op;
+  result = SYSCALL(WAITIO, DISKINT, diskNum, 0);
   setSTATUS(status);
 
-  /* 11. Unlock disk device semaphore */
-  SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskNo], 0, 0);
+  if (result == READY) {
+    excState->s_v0 = result;
 
-  /* 12. Return device status code to user */
-  excState->s_v0 = (result == READY) ? result : -result;
+    if (op == DISK_READBLK) {
+      /* For disk read operations, copy data from DMA buffer to user space */
+      memcopy((void *)logicalAddr, (void *)dmaBuf, PAGESIZE);
+    }
+  } else {
+    excState->s_v0 = -result;
+  }
 
-  /* 13. Resume U-proc execution */
+  /* Release device semaphore */
+  SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskNum], 0, 0);
+
   switchContext(excState);
 }
 
-void sysDiskGet(state_t *excState, support_t *sup) {
-  memaddr logicalAddr = excState->s_a1;
-  int diskNo = excState->s_a2;
-  int sectorNo = excState->s_a3;
+/* SYS14 */
+void sysDiskWrite(state_t *excState, support_t *sup) {
+  diskOperation(excState, sup, DISK_WRITEBLK);
+}
 
-  /* 1. Validate disk number: must be in [1..7], DISK0 is reserved for backing
-   * store */
-  if (diskNo <= 0 || diskNo >= DEVPERINT) {
-    programTrapHandler(sup);
-  }
-
-  /* 2. Validate logical address lies completely within KUSEG */
-  if (!isValidAddr(logicalAddr) || !isValidAddr(logicalAddr + PAGESIZE - 1)) {
-    programTrapHandler(sup);
-  }
-
-  /* 3. Calculate DMA buffer address and get disk device register pointer */
-  memaddr dmaBuf = DISK_DMA_BASE + diskNo * PAGESIZE;
-  devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
-  device_t *disk =
-      &busRegArea->devreg[(DISKINT - DISKINT) * DEVPERINT + diskNo];
-
-  /* 4. Read geometry and validate sector number against disk capacity */
-  unsigned int data1 = disk->d_data1;
-  int maxCyl = GET_DISK_CYLINDER(data1);
-  int maxHead = GET_DISK_HEAD(data1);
-  int maxSect = GET_DISK_SECTOR(data1);
-  int maxSector = maxCyl * maxHead * maxSect;
-
-  if (sectorNo < 0 || sectorNo >= maxSector) {
-    programTrapHandler(sup);
-  }
-
-  /* 5. Lock disk device semaphore for exclusive access */
-  SYSCALL(PASSEREN, (int)&supportDeviceSem[diskNo], 0, 0);
-
-  /* 6. Translate sector number */
-  int cyl = sectorNo / (maxHead * maxSect);
-  int rem = sectorNo % (maxHead * maxSect);
-  int head = rem / maxSect;
-  int sect = rem % maxSect;
-
-  /* 7. Issue SEEK command with interrupts disabled */
-  unsigned int status = getSTATUS();
-  setSTATUS(status & ~STATUS_IEC);
-  disk->d_command = (cyl << BYTELEN) | SEEKCYL;
-  SYSCALL(WAITIO, DISKINT, diskNo, 0);
-  setSTATUS(status);
-
-  /* 8. Set DMA buffer address in device register */
-  disk->d_data0 = dmaBuf;
-
-  /* 9. Issue READBLK command with interrupts disabled */
-  setSTATUS(status & ~STATUS_IEC);
-  disk->d_command = (head << BYTELEN) | sect | DISK_READBLK;
-  int result = SYSCALL(WAITIO, DISKINT, diskNo, 0);
-  setSTATUS(status);
-
-  /* 10. Unlock disk device semaphore */
-  SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskNo], 0, 0);
-
-  /* 11. Copy one page from kernel DMA buffer to user space */
-  memcopy((void *)logicalAddr, (void *)dmaBuf, PAGESIZE);
-
-  /* 12. Return device status code to user */
-  excState->s_v0 = (result == READY) ? result : -result;
-
-  /* 13. Resume user process */
-  switchContext(excState);
+/* SYS15 */
+void sysDiskRead(state_t *excState, support_t *sup) {
+  diskOperation(excState, sup, DISK_READBLK);
 }
 
 int writeFlashPage(int flashNum, int blockNum, memaddr src) {

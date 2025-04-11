@@ -111,20 +111,15 @@
 #define RESET			    0
 #define ACK				    1
 
-/* Disk Geometry Parsing from DATA1 Register */
-#define DISK_CYLINDER_MASK     0xFFFF0000
-#define DISK_CYLINDER_SHIFT    16
+/* bit shift values for writing values to COMMAND register of disk device */
+#define DISK_CYL_SHIFT      8
+#define DISK_SECT_SHIFT     8
+#define DISK_HEAD_SHIFT     16
 
-#define DISK_HEAD_MASK         0x0000FF00
-#define DISK_HEAD_SHIFT        8
-
-#define DISK_SECTOR_MASK       0x000000FF
-#define DISK_SECTOR_SHIFT      0
-
-/* Helper macros to extract values */
-#define GET_DISK_CYLINDER(data1)  (((data1) & DISK_CYLINDER_MASK) >> DISK_CYLINDER_SHIFT)
-#define GET_DISK_HEAD(data1)      (((data1) & DISK_HEAD_MASK) >> DISK_HEAD_SHIFT)
-#define GET_DISK_SECTOR(data1)    (((data1) & DISK_SECTOR_MASK) >> DISK_SECTOR_SHIFT)
+/* helper macros to extract values of Disk Geometry from DATA1 Register */
+#define GET_DISK_CYLINDER(data1)  (((data1) & 0xFFFF0000) >> 16)
+#define GET_DISK_HEAD(data1)      (((data1) & 0x0000FF00) >> 8)
+#define GET_DISK_SECTOR(data1)    ((data1) & 0x000000FF)
 
 #define SEEKCYL             2
 #define DISK_READBLK        3
@@ -220,27 +215,27 @@ For a 32-bit EntryLo, the format is:
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
 
 /* Nucleus system call codes */
-#define	CREATEPROCESS	    1	  /* create process */
-#define	TERMINATEPROCESS	2	  /* terminate process */
-#define	PASSEREN			    3	  /* P a semaphore */
-#define	VERHOGEN		      4	  /* V a semaphore */
-#define	WAITIO			      5	  /* delay on a io semaphore */
-#define	GETCPUTIME		    6	  /* get cpu time used to date */
-#define	WAITCLOCK		      7	  /* delay on the clock semaphore */
-#define	GETSUPPORTPTR     8	  /* return support structure ptr. */
+#define	CREATEPROCESS	    1	    /* create process */
+#define	TERMINATEPROCESS	2	    /* terminate process */
+#define	PASSEREN			    3	    /* P a semaphore */
+#define	VERHOGEN		      4	    /* V a semaphore */
+#define	WAITIO			      5	    /* delay on a io semaphore */
+#define	GETCPUTIME		    6	    /* get cpu time used to date */
+#define	WAITCLOCK		      7	    /* delay on the clock semaphore */
+#define	GETSUPPORTPTR     8	    /* return support structure ptr. */
 
 /* Support Level system call codes */
-#define TERMINATE         9   /* Terminate U-proc */
-#define GETTOD           10   /* Get Time of Day */
-#define WRITEPRINTER     11   /* Write to Printer */
-#define WRITETERMINAL    12   /* Write to Terminal */
-#define READTERMINAL     13   /* Read from Terminal */
-#define DISKPUT          14   /* Write to Disk */
-#define DISKGET          15   /* Read from Disk */
+#define TERMINATE         9     /* Terminate U-proc */
+#define GETTOD            10    /* Get Time of Day */
+#define WRITEPRINTER      11    /* Write to Printer */
+#define WRITETERMINAL     12    /* Write to Terminal */
+#define READTERMINAL      13    /* Read from Terminal */
+#define DISKWRITE         14    /* Write to Disk */
+#define DISKREAD          15    /* Read from Disk */
 
 /* Device-specific constants */
-#define PRINTER_MAXLEN   128  /* Max length for SYS11 */
-#define TERMINAL_MAXLEN  128  /* Max length for SYS12 */
+#define PRINTER_MAXLEN   128    /* Max length for SYS11 */
+#define TERMINAL_MAXLEN  128    /* Max length for SYS12 */
 
 
 #endif
