@@ -160,7 +160,7 @@ void uTLB_ExceptionHandler() {
     /* 8.(c). Write to old process's backing store */
     memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
     int oldPageIdx = oldVpn % MAXPAGES;
-    if (writeFlashPage(oldAsid - 1, oldPageIdx, frameAddr) <= 0) {
+    if (flashOperation(oldAsid - 1, oldPageIdx, frameAddr, FLASH_WRITEBLK) == ERR) {
       SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
       programTrapHandler(sup); /* I/O error as trap */
     }
@@ -168,7 +168,7 @@ void uTLB_ExceptionHandler() {
 
   /* 9. Read current process's page p into frame i */
   memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
-  if (readFlashPage(sup->sup_asid - 1, pageIdx, frameAddr) <= 0) {
+  if (flashOperation(sup->sup_asid - 1, pageIdx, frameAddr, FLASH_READBLK) == ERR) {
     SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
     programTrapHandler(sup); /* I/O error as trap */
   }

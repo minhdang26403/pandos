@@ -11,12 +11,12 @@
 
 #include "../h/types.h"
 
-int writeFlashPage(int flashNum, int blockNum, memaddr src);
-int readFlashPage(int flashNum, int blockNum, memaddr dest);
-
 void sysDiskWrite(state_t *excState, support_t *sup);
 void sysDiskRead(state_t *excState, support_t *sup);
-void sysFlashPut(state_t *excState, support_t *sup);
-void sysFlashGet(state_t *excState, support_t *sup);
+void sysFlashWrite(state_t *excState, support_t *sup);
+void sysFlashRead(state_t *excState, support_t *sup);
+
+int flashOperation(unsigned int flashNum, unsigned int blockNum,
+                   memaddr frameAddr, unsigned int op);
 
 #endif

@@ -232,6 +232,8 @@ For a 32-bit EntryLo, the format is:
 #define READTERMINAL      13    /* Read from Terminal */
 #define DISKWRITE         14    /* Write to Disk */
 #define DISKREAD          15    /* Read from Disk */
+#define FLASHWRITE        16    /* Write to Flash */
+#define FLASHREAD         17    /* Read from Flash */
 
 /* Device-specific constants */
 #define PRINTER_MAXLEN   128    /* Max length for SYS11 */

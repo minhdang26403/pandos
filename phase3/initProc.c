@@ -57,7 +57,7 @@ HIDDEN void initPageTable(support_t *sup, int asid) {
   char headerBuf[PAGESIZE];
 
   /* Read the header from flash (block 0) into headerBuf */
-  if (readFlashPage(asid - 1, 0, (memaddr)headerBuf) == ERR) {
+  if (flashOperation(asid - 1, 0, (memaddr)headerBuf, FLASH_READBLK) == ERR) {
     /* If reading the header fails, treat it as a program trap */
     programTrapHandler(sup);
   }
