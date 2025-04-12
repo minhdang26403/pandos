@@ -311,6 +311,10 @@ HIDDEN void syscallHandler(support_t *sup) {
         sysDiskWrite(excState, sup);
       case DISKREAD:
         sysDiskRead(excState, sup);
+      case FLASHWRITE:
+        sysFlashWrite(excState, sup);
+      case FLASHREAD:
+        sysFlashRead(excState, sup);        
       default:
         break;
     }
