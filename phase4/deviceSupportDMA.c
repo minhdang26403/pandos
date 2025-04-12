@@ -17,12 +17,22 @@ HIDDEN void memcopy(void *dest, const void *src, unsigned int size) {
   }
 }
 
+/*
+ * Perform a disk I/O operation (read or write) on the specified device and
+ * sector. Handles DMA setup, user/kernel data copy, and disk I/O with semaphore
+ * protection.
+ *
+ * Parameters:
+ *   excState   - Saved exception state with syscall arguments
+ *   sup        - Support structure for the calling U-proc
+ *   op         - Operation type (DISK_READBLK or DISK_WRITEBLK)
+ */
 HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
   memaddr logicalAddr = excState->s_a1;
   unsigned int diskNum = excState->s_a2;
   unsigned int sectorNum = excState->s_a3;
 
-  /* Validate logical address lies entirely within KUSEG */
+  /* Validate that the logical address lies fully within KUSEG */
   if (!isValidAddr(logicalAddr) || !isValidAddr(logicalAddr + PAGESIZE - 1)) {
     programTrapHandler(sup);
   }
@@ -51,7 +61,7 @@ HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
     programTrapHandler(sup);
   }
 
-  /* Translate sector number to (cylinder, head, sector) */
+  /* Translate sector number to cylinder, head, sector */
   unsigned int cyl = sectorNum / (maxHead * maxSect);
   unsigned int rem = sectorNum % (maxHead * maxSect);
   unsigned int head = rem / maxSect;
@@ -60,7 +70,7 @@ HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
   /* Compute physical DMA buffer address for this disk */
   memaddr dmaBuf = DISK_DMA_BASE + diskNum * PAGESIZE;
 
-  /* Gain exclusive access to the device register and DMA buffer */
+  /* Gain exclusive access to device register and DMA buffer */
   SYSCALL(PASSEREN, (int)&supportDeviceSem[devIdx], 0, 0);
 
   if (op == DISK_WRITEBLK) {
@@ -76,7 +86,7 @@ HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
   setSTATUS(status);
 
   if (result != READY) {
-    /* Abort on SEEK failure */
+    /* Release semaphore and return error on seek failure */
     SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
     excState->s_v0 = -result;
     switchContext(excState);
@@ -85,7 +95,7 @@ HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
   /* Set DMA buffer address */
   disk->d_data0 = dmaBuf;
 
-  /* Issue READ or WRITE command */
+  /* Perform read or write operation */
   setSTATUS(status & ~STATUS_IEC);
   disk->d_command = (head << DISK_HEAD_SHIFT) | (sect << DISK_SECT_SHIFT) | op;
   result = SYSCALL(WAITIO, DISKINT, diskNum, 0);
@@ -105,6 +115,7 @@ HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
   /* Release device semaphore */
   SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskNum], 0, 0);
 
+  /* Resume user process */
   switchContext(excState);
 }
 
