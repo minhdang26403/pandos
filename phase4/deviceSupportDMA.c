@@ -113,7 +113,7 @@ HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
   }
 
   /* Release device semaphore */
-  SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskNum], 0, 0);
+  SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
 
   /* Resume user process */
   switchContext(excState);
