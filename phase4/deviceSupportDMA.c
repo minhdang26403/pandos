@@ -58,7 +58,8 @@ HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
   unsigned int maxSector = maxCyl * maxHead * maxSect;
 
   if (sectorNum >= maxSector) {
-    programTrapHandler(sup);
+    excState->s_v0 = ERR;
+    switchContext(excState);
   }
 
   /* Translate sector number to cylinder, head, sector */
