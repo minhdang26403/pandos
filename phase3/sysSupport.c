@@ -288,7 +288,7 @@ HIDDEN void syscallHandler(support_t *sup) {
   state_t *excState = &sup->sup_exceptState[GENERALEXCEPT];
   int syscallNum = excState->s_a0;
 
-  if (syscallNum >= TERMINATE && syscallNum <= READTERMINAL) {
+  if (syscallNum >= TERMINATE && syscallNum <= FLASHREAD) {
     excState->s_pc += WORDLEN; /* control of the current process should be
                                   returned to the next instruction */
     switch (syscallNum) {
