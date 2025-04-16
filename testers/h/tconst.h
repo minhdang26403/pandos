@@ -24,10 +24,10 @@
 #define WRITEPRINTER	11
 #define WRITETERMINAL 	12
 #define READTERMINAL	13
-#define DISK_GET		14
-#define DISK_PUT		15
-#define	FLASH_GET		16
-#define FLASH_PUT		17
+#define DISK_PUT		14
+#define DISK_GET		15
+#define FLASH_PUT		16
+#define	FLASH_GET		17
 #define DELAY			18
 #define PSEMVIRT		19
 #define VSEMVIRT		20
