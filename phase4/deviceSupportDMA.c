@@ -17,30 +17,31 @@ HIDDEN void memcopy(void *dest, const void *src, unsigned int size) {
   }
 }
 
-/*
- * Perform a disk I/O operation (read or write) on the specified device and
- * sector. Handles DMA setup, user/kernel data copy, and disk I/O with semaphore
- * protection.
+/**
+ * @brief Perform a disk I/O operation (read or write) on the specified device
+ * and sector. Handles DMA buffer setup, user/kernel data transfer, device
+ * synchronization, and sector validation.
  *
- * Parameters:
- *   excState   - Saved exception state with syscall arguments
- *   sup        - Support structure for the calling U-proc
- *   op         - Operation type (DISK_READBLK or DISK_WRITEBLK)
+ * @param excState the saved exception state
+ * @param sup the support structure of the calling U-proc
+ * @param op operation type (DISK_READBLK or DISK_WRITEBLK)
  */
-HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
+HIDDEN void sysDiskOperation(state_t *excState, support_t *sup,
+                             unsigned int op) {
   memaddr logicalAddr = excState->s_a1;
   unsigned int diskNum = excState->s_a2;
   unsigned int sectorNum = excState->s_a3;
 
-  /* Validate that the logical address lies fully within KUSEG */
+  /* Validate that logical address lies entirely in KUSEG */
   if (!isValidAddr(logicalAddr) || !isValidAddr(logicalAddr + PAGESIZE - 1)) {
     programTrapHandler(sup);
   }
 
   /*
    * Validate disk number: must be in [1..7]
-   * Note: diskNum is unsigned, so negative diskNum value is wrapped around to a
-   * very large integer. Disk 0 is reserved for the backing store.
+   * Note: diskNum is unsigned, so a negative diskNum value is wrapped around to
+   * a very large integer. Disk 0 is reserved as backing store and must not be
+   * accessed by user code.
    */
   if (diskNum == 0 || diskNum >= DEVPERINT) {
     programTrapHandler(sup);
@@ -62,22 +63,47 @@ HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
     switchContext(excState);
   }
 
-  /* Translate sector number to cylinder, head, sector */
-  unsigned int cyl = sectorNum / (maxHead * maxSect);
-  unsigned int rem = sectorNum % (maxHead * maxSect);
-  unsigned int head = rem / maxSect;
-  unsigned int sect = rem % maxSect;
-
   /* Compute physical DMA buffer address for this disk */
   memaddr dmaBuf = DISK_DMA_BASE + diskNum * PAGESIZE;
 
   /* Gain exclusive access to device register and DMA buffer */
   SYSCALL(PASSEREN, (int)&supportDeviceSem[devIdx], 0, 0);
 
+  /* For disk write operations, copy data from user space to DMA buffer */
   if (op == DISK_WRITEBLK) {
-    /* For disk write operations, copy data from user space to DMA buffer */
     memcopy((void *)dmaBuf, (void *)logicalAddr, PAGESIZE);
   }
+
+  excState->s_v0 = diskOperation(diskNum, sectorNum, dmaBuf, op);
+
+  /* For successful disk reads, copy data from DMA buffer to user space */
+  if (excState->s_v0 == READY && op == DISK_READBLK) {
+    memcopy((void *)logicalAddr, (void *)dmaBuf, PAGESIZE);
+  }
+
+  /* Release device semaphore */
+  SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
+
+  /* Resume user process */
+  switchContext(excState);
+}
+
+int diskOperation(unsigned int diskNum, unsigned int sectorNum,
+                  memaddr frameAddr, unsigned int op) {
+  unsigned int devIdx = (DISKINT - DISKINT) * DEVPERINT + diskNum;
+  devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
+  device_t *disk = &busRegArea->devreg[devIdx];
+
+  /* Read disk geometry from DATA1 */
+  unsigned int data1 = disk->d_data1;
+  unsigned int maxHead = GET_DISK_HEAD(data1);
+  unsigned int maxSect = GET_DISK_SECTOR(data1);
+
+  /* Translate sector number to cylinder, head, sector */
+  unsigned int cyl = sectorNum / (maxHead * maxSect);
+  unsigned int rem = sectorNum % (maxHead * maxSect);
+  unsigned int head = rem / maxSect;
+  unsigned int sect = rem % maxSect;
 
   /* Issue SEEK to position disk head at the correct cylinder */
   unsigned int status = getSTATUS();
@@ -87,14 +113,12 @@ HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
   setSTATUS(status);
 
   if (result != READY) {
-    /* Release semaphore and return error on seek failure */
-    SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
-    excState->s_v0 = -result;
-    switchContext(excState);
+    /* return error on seek failure */
+    return -result;
   }
 
   /* Set DMA buffer address */
-  disk->d_data0 = dmaBuf;
+  disk->d_data0 = frameAddr;
 
   /* Perform read or write operation */
   setSTATUS(status & ~STATUS_IEC);
@@ -102,22 +126,7 @@ HIDDEN void diskOperation(state_t *excState, support_t *sup, unsigned int op) {
   result = SYSCALL(WAITIO, DISKINT, diskNum, 0);
   setSTATUS(status);
 
-  if (result == READY) {
-    excState->s_v0 = result;
-
-    if (op == DISK_READBLK) {
-      /* For disk read operations, copy data from DMA buffer to user space */
-      memcopy((void *)logicalAddr, (void *)dmaBuf, PAGESIZE);
-    }
-  } else {
-    excState->s_v0 = -result;
-  }
-
-  /* Release device semaphore */
-  SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
-
-  /* Resume user process */
-  switchContext(excState);
+  return (result == READY) ? result : -result;
 }
 
 /* Shared syscall implementation for SYS16 (Flash_Put) and SYS17 (Flash_Get).
@@ -158,30 +167,16 @@ HIDDEN void sysFlashOperation(state_t *excState, support_t *sup,
   /* Gain exclusive access to the device register and DMA buffer */
   SYSCALL(PASSEREN, (int)&supportDeviceSem[devIdx], 0, 0);
 
+  /* If writing: copy one page from user space to kernel DMA buffer */
   if (op == FLASH_WRITEBLK) {
-    /* If writing: copy one page from user space to kernel DMA buffer */
     memcopy((void *)dmaBuf, (void *)logicalAddr, PAGESIZE);
   }
 
-  /* Set DMA buffer physical address in flash register */
-  flash->d_data0 = dmaBuf;
+  excState->s_v0 = flashOperation(flashNum, blockNum, dmaBuf, op);
 
-  /* Issue command to flash device with interrupts disabled */
-  unsigned int status = getSTATUS();
-  setSTATUS(status & ~STATUS_IEC);
-  flash->d_command = (blockNum << BYTELEN) | op;
-  int result = SYSCALL(WAITIO, FLASHINT, flashNum, 0);
-  setSTATUS(status);
-
-  if (result == READY) {
-    excState->s_v0 = result;
-
-    if (op == FLASH_READBLK) {
-      /* If reading: copy one page from DMA buffer into user space */
-      memcopy((void *)logicalAddr, (void *)dmaBuf, PAGESIZE);
-    }
-  } else {
-    excState->s_v0 = -result;
+  /* If reading: copy one page from DMA buffer into user space */
+  if (excState->s_v0 == READY && op == FLASH_READBLK) {
+    memcopy((void *)logicalAddr, (void *)dmaBuf, PAGESIZE);
   }
 
   /* Release device semaphore */
@@ -191,39 +186,15 @@ HIDDEN void sysFlashOperation(state_t *excState, support_t *sup,
   switchContext(excState);
 }
 
-/* SYS14 */
-void sysDiskWrite(state_t *excState, support_t *sup) {
-  diskOperation(excState, sup, DISK_WRITEBLK);
-}
-
-/* SYS15 */
-void sysDiskRead(state_t *excState, support_t *sup) {
-  diskOperation(excState, sup, DISK_READBLK);
-}
-
-/* SYS16 */
-void sysFlashWrite(state_t *excState, support_t *sup) {
-  sysFlashOperation(excState, sup, FLASH_WRITEBLK);
-}
-
-/* SYS17 */
-void sysFlashRead(state_t *excState, support_t *sup) {
-  sysFlashOperation(excState, sup, FLASH_READBLK);
-}
-
-/*
- * Perform a flash I/O operation (READ or WRITE) on the specified device and
- * block. Used by the Pager to interact with the backing store.
+/**
+ * @brief Perform a flash I/O operation (READ or WRITE) on the specified device
+ * and block. Used by the Pager to interact with the backing store.
  *
- * Parameters:
- *   - flashNum: Flash device number in [0..7]
- *   - blockNum: Flash block number (must be valid)
- *   - frameAddr: Physical RAM address for the 4KB page (DMA buffer)
- *   - op: Either FLASH_READBLK or FLASH_WRITEBLK
- *
- * Returns:
- *   - OK (0) if I/O completed successfully
- *   - ERR (-1) if the I/O failed (device not installed or other error)
+ * @param flashNum flash device number in [0..7]
+ * @param blockNum flash block number (must be valid)
+ * @param frameAddr Physical RAM address for the 4KB page (DMA buffer)
+ * @param op operation type (either FLASH_READBLK or FLASH_WRITEBLK)
+ * @return OK (0) if I/O completed successfully; otherwise, ERR (-1)
  */
 int flashOperation(unsigned int flashNum, unsigned int blockNum,
                    memaddr frameAddr, unsigned int op) {
@@ -231,9 +202,6 @@ int flashOperation(unsigned int flashNum, unsigned int blockNum,
   unsigned devIdx = (FLASHINT - DISKINT) * DEVPERINT + flashNum;
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *flash = &busRegArea->devreg[devIdx];
-
-  /* Gain exclusive access to the device register */
-  SYSCALL(PASSEREN, (int)&supportDeviceSem[devIdx], 0, 0);
 
   /* Set DMA buffer physical address in flash register */
   flash->d_data0 = frameAddr;
@@ -245,8 +213,35 @@ int flashOperation(unsigned int flashNum, unsigned int blockNum,
   int result = SYSCALL(WAITIO, FLASHINT, flashNum, 0);
   setSTATUS(status);
 
-  /* Release device semaphore */
-  SYSCALL(VERHOGEN, (int)&supportDeviceSem[devIdx], 0, 0);
+  return (result == READY) ? result : -result;
+}
 
-  return (result == READY) ? OK : ERR;
+/**
+ * @brief SYS14: Write one page (4KB) to a disk sector
+ *
+ * @param excState the saved exception state
+ * @param sup the support structure of the calling U-proc
+ */
+void sysDiskWrite(state_t *excState, support_t *sup) {
+  sysDiskOperation(excState, sup, DISK_WRITEBLK);
+}
+
+/**
+ * @brief SYS15: Read one page (4KB) from a disk sector
+ *
+ * @param excState the saved exception state
+ * @param sup the support structure of the calling U-proc
+ */
+void sysDiskRead(state_t *excState, support_t *sup) {
+  sysDiskOperation(excState, sup, DISK_READBLK);
+}
+
+/* SYS16 */
+void sysFlashWrite(state_t *excState, support_t *sup) {
+  sysFlashOperation(excState, sup, FLASH_WRITEBLK);
+}
+
+/* SYS17 */
+void sysFlashRead(state_t *excState, support_t *sup) {
+  sysFlashOperation(excState, sup, FLASH_READBLK);
 }
