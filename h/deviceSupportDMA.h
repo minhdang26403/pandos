@@ -1,12 +1,14 @@
-
 #ifndef DEVICE_SUPPORT_DMA
 #define DEVICE_SUPPORT_DMA
 
-/************************** DEVICESUPPORTDMA.H ******************************
+/**
+ * @file deviceSupportDMA.h
+ * @author Dang Truong
+ * @brief The externals declaration file for the DMA Device Module.
+ * @date 2025-04-18
  *
- *  The externals declaration file for the DMA Device Support module.
+ * @copyright Copyright (c) 2025
  *
- *  Written by Dang Truong
  */
 
 #include "../h/types.h"

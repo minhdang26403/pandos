@@ -1,11 +1,15 @@
 #ifndef SUPPORT_ALLOC_H
 #define SUPPORT_ALLOC_H
 
-/************************** SUPPORTALLOC.H ******************************
+/**
+ * @file supportAlloc.h
+ * @author Dang Truong
+ * @brief The externals declaration file for the Support Structure Allocation
+ * Module.
+ * @date 2025-04-18
  *
- *  The externals declaration file for the Support Structure Allocation module.
+ * @copyright Copyright (c) 2025
  *
- *  Written by Dang Truong
  */
 
 #include "types.h"

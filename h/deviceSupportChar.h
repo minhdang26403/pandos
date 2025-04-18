@@ -1,12 +1,14 @@
-
 #ifndef DEVICE_SUPPORT_CHAR
 #define DEVICE_SUPPORT_CHAR
 
-/************************** DEVICESUPPORTCHAR.H ******************************
+/**
+ * @file deviceSupportChar.h
+ * @author Dang Truong
+ * @brief The externals declaration file for the Character Device Module.
+ * @date 2025-04-18
  *
- *  The externals declaration file for the Character Device Support module.
+ * @copyright Copyright (c) 2025
  *
- *  Written by Dang Truong
  */
 
 #endif

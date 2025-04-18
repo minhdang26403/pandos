@@ -1,14 +1,15 @@
 #ifndef SCHEDULER
 #define SCHEDULER
 
-/************************** SCHEDULER.H ******************************
+/**
+ * @file scheduler.h
+ * @author Dang Truong
+ * @brief The externals declaration file for the Scheduler Module.
+ * @date 2025-04-18
  *
- *  The externals declaration file for the Scheduler Module.
+ * @copyright Copyright (c) 2025
  *
- *  Written by Dang Truong
  */
-
-/***************************************************************/
 
 #include "../h/types.h"
 

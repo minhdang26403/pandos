@@ -1,15 +1,15 @@
 #ifndef INTERRUPTS
 #define INTERRUPTS
 
-/************************** INTERRUPTS.H ******************************
+/**
+ * @file interrupts.h
+ * @author Dang Truong
+ * @brief The externals declaration file for Device Interrupt Handler Module.
+ * @date 2025-04-18
  *
- *  The externals declaration file for the Device Interrupt Handler
- *    Module.
+ * @copyright Copyright (c) 2025
  *
- *  Written by Dang Truong
  */
-
-/***************************************************************/
 
 #include "../h/types.h"
 

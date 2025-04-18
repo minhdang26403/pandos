@@ -1,11 +1,14 @@
 #ifndef INIT_PROC
 #define INIT_PROC
 
-/************************** INITPROC.H ******************************
+/**
+ * @file initProc.h
+ * @author Dang Truong
+ * @brief The externals declaration file for the Process Initialization Module.
+ * @date 2025-04-18
  *
- *  The externals declaration file for the Process Initialization Module.
+ * @copyright Copyright (c) 2025
  *
- *  Written by Dang Truong
  */
 
 #include "../h/const.h"
