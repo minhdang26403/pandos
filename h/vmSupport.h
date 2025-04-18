@@ -15,6 +15,7 @@
 #include "../h/types.h"
 
 void initSwapStructs();
+void releaseFrames(int asid);
 int isValidAddr(memaddr addr);
 void uTLB_ExceptionHandler();
 

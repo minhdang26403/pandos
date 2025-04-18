@@ -60,21 +60,8 @@ void supportExceptionHandler() {
  * @param sup Pointer to the support structure of the U-proc to be terminated.
  */
 HIDDEN void sysTerminate(support_t *sup) {
-  /* Gain a mutual exclusion on Swap Pool Table */
-  SYSCALL(PASSEREN, (int)&swapPoolSem, 0, 0);
-
   /* Free frames occupied by this U-proc */
-  int asid = sup->sup_asid;
-  int i;
-  for (i = 0; i < SWAP_POOL_SIZE; i++) {
-    if (swapPoolTable[i].spte_asid == asid) {
-      swapPoolTable[i].spte_asid = ASID_UNOCCUPIED;
-      swapPoolTable[i].spte_vpn = 0;
-      swapPoolTable[i].spte_pte = NULL;
-    }
-  }
-
-  SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
+  releaseFrames(sup->sup_asid);
 
   /* Signal termination to test */
   SYSCALL(VERHOGEN, (int)&masterSemaphore, 0, 0);

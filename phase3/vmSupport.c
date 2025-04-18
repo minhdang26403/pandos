@@ -16,7 +16,6 @@
 #include "../h/const.h"
 #include "../h/deviceSupportDMA.h"
 #include "../h/exceptions.h"
-#include "../h/initProc.h"
 #include "../h/initial.h"
 #include "../h/scheduler.h"
 #include "../h/sysSupport.h"
@@ -25,6 +24,8 @@
 
 /* Module-wide variables */
 HIDDEN memaddr swapPool; /* RAM frames set aside to support virtual memory */
+spte_t swapPoolTable[SWAP_POOL_SIZE]; /* Swap Pool table */
+int swapPoolSem;                      /* Swap Pool semaphore: mutex */
 
 /**
  * @brief Initialize the Swap Pool data structures.
@@ -48,6 +49,31 @@ void initSwapStructs() {
   /* Initialize Swap Pool semaphore to 1, providing mutual exclusion for the
    * swapPoolTable */
   swapPoolSem = 1;
+}
+
+/**
+ * @brief Free all swap pool frames owned by the given U-proc.
+ *
+ * Iterates through the swap pool table and invalidates any frame associated
+ * with the given ASID. Ensures mutual exclusion by acquiring and releasing the
+ * swap pool semaphore.
+ *
+ * @param asid The Address Space Identifier (ASID) of the process whose frames
+ * are being freed.
+ */
+void releaseFrames(int asid) {
+  SYSCALL(PASSEREN, (int)&swapPoolSem, 0, 0);
+
+  int i;
+  for (i = 0; i < SWAP_POOL_SIZE; i++) {
+    if (swapPoolTable[i].spte_asid == asid) {
+      swapPoolTable[i].spte_asid = ASID_UNOCCUPIED;
+      swapPoolTable[i].spte_vpn = 0;
+      swapPoolTable[i].spte_pte = NULL;
+    }
+  }
+
+  SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
 }
 
 /**
