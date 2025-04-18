@@ -1,37 +1,33 @@
-/************************** SUPPORTALLOC.C ******************************
+/**
+ * @file supportAlloc.c
+ * @author Dang Truong, Loc Pham
+ * @brief Implements a free-list allocator for support_t structures used in the
+ * Support Level. A free-list is maintained as a stack (array of pointers) to
+ * support_t structures. This module provides routines to allocate a support
+ * structure from the free list, return one to the free list, and initialize the
+ * free list with a statically allocated array.
+ * @date 2025-04-17
  *
- * Purpose: Implements a free-list allocator for support_t structures used in the
- *          Support Level. A free-list is maintained as a stack (array of pointers)
- *          to support_t structures. This module provides routines to allocate a
- *          support structure from the free list, return one to the free list, and
- *          initialize the free list with a statically allocated array.
+ * @copyright Copyright (c) 2025
  *
- * Written by Dang Truong, Loc Pham
- *
- ***********************************************************************/
+ */
 
 #include "../h/supportAlloc.h"
 
-/*
- * supportFreeList: Array of pointers representing the free list of support_t structures.
- * supportFreeListTop: Index of the top element of the free list (-1 indicates the list is empty).
- *
- * Note: We choose not to do the Phase 1 way, where we had a global pointer to the head of the 
- * free PCB list. In this case, we would have to add a new next pointer field in support_t
- * struct, which doesn't make sense.
- */
+/* Stack of available support_t structures (used as a free list). */
 HIDDEN support_t *supportFreeList[MAX_UPROCS];
+
+/* Index of the top of the supportFreeList stack. -1 indicates empty. */
 HIDDEN int supportFreeListTop;
 
-
-/*
- * Function: supportAlloc
- * Purpose: Allocates and returns a pointer to a support_t structure from the free list.
- *          If the free list is empty, NULL is returned.
- * Parameters: None.
- * Returns:
- *    - Pointer to a support_t structure if available.
- *    - NULL if no support structures are available.
+/**
+ * @brief Allocate a support_t structure from the free list.
+ *
+ * Implements a stack-based allocator. Returns the top support structure
+ * from the free list and updates the stack index.
+ *
+ * @return Pointer to a support_t structure if available; NULL if the free list
+ * is empty.
  */
 support_t *supportAlloc() {
   if (supportFreeListTop < 0) {
@@ -40,24 +36,23 @@ support_t *supportAlloc() {
   return supportFreeList[supportFreeListTop--];
 }
 
-
-/*
- * Function: supportDeallocate
- * Purpose: Returns a support_t structure back to the free list.
- * Parameters:
- *    - sup: Pointer to the support_t structure to be deallocated.
- * Returns: None.
+/**
+ * @brief Return a support_t structure to the free list.
+ *
+ * Pushes the given support structure back onto the stack-based free list.
+ *
+ * @param sup Pointer to the support_t structure to deallocate.
  */
 void supportDeallocate(support_t *sup) {
   supportFreeList[++supportFreeListTop] = sup;
 }
 
-/*
- * Function: initSupportFreeList
- * Purpose: Initializes the free list for support_t structures by pushing each element
- *          from a statically allocated array into the free list.
- * Parameters: None.
- * Returns: None.
+/**
+ * @brief Initialize the support_t structure free list.
+ *
+ * Prepares a statically allocated array of support_t structures and populates
+ * the stack-based free list with them. Called once at system startup by the
+ * Support Level.
  */
 void initSupportFreeList() {
   /* Storage for U-procs' support structures */

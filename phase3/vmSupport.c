@@ -1,13 +1,15 @@
-/************************** VMSUPPORT.C ******************************
+/**
+ * @file vmSupport.c
+ * @author Dang Truong, Loc Pham
+ * @brief Implements the Support Level's virtual memory support routines,
+ * including the TLB exception handler (Pager) and the functions for reading
+ * from and writing to flash devices. This module also manages the Swap Pool
+ * data structures used for paging.
+ * @date 2025-04-17
  *
- * Purpose: Implements the Support Level's virtual memory support routines,
- *          including the TLB exception handler (Pager) and the functions for
- *          reading from and writing to flash devices. This module also manages
- *          the Swap Pool data structures used for paging.
+ * @copyright Copyright (c) 2025
  *
- * Written by Dang Truong, Loc Pham
- *
- ***************************************************************/
+ */
 
 #include "../h/vmSupport.h"
 
@@ -24,13 +26,12 @@
 /* Module-wide variables */
 HIDDEN memaddr swapPool; /* RAM frames set aside to support virtual memory */
 
-/*
- * Function: initSwapStructs
- * Purpose: Initialize the Swap Pool data structures. This includes setting the starting
- *          address for the Swap Pool, initializing each entry in the Swap Pool table to
- *          indicate that it is unoccupied, and setting the Swap Pool semaphore for mutual
- *          exclusion.
- * Parameters: None.
+/**
+ * @brief Initialize the Swap Pool data structures.
+ *
+ * - Sets the base address for swap pool frames.
+ * - Marks all entries in the swap pool table as unoccupied.
+ * - Initializes the swap pool semaphore to 1 (for mutual exclusion).
  */
 void initSwapStructs() {
   /* Place the Swap Pool after the end of the operating system code */
@@ -49,22 +50,22 @@ void initSwapStructs() {
   swapPoolSem = 1;
 }
 
-/*
- * Function: isValidAddr
- * Purpose: Validate that a given memory address is within the U-proc's logical
- *          address space (KUSEG). Returns non-zero if valid; zero otherwise.
- * Parameters:
- *    - addr: The memory address to validate.
+/**
+ * @brief Check if a virtual address lies within the U-proc's user segment
+ * (KUSEG).
+ *
+ * @param addr Virtual address to validate.
+ * @return 1 if the address is valid (>= KUSEG); 0 otherwise.
  */
 int isValidAddr(memaddr addr) { return addr >= KUSEG; }
 
-/*
- * Function: chooseFrame
- * Purpose: Chooses a frame from the Swap Pool for paging. It first searches for an unoccupied
- *          frame; if none is available, it uses a FIFO (round-robin) algorithm as a fallback.
- * Parameters: None.
- * Returns:
- *    - The index of the allocated frame within the Swap Pool.
+/**
+ * @brief Select a frame from the swap pool to load a virtual page.
+ *
+ * First attempts to find an unoccupied frame. If none are free, applies a FIFO
+ * (round-robin) replacement policy using a static index.
+ *
+ * @return Index of the chosen frame within the swap pool.
  */
 HIDDEN int chooseFrame() {
   /* FIFO index as a fallback (not default) page replacement policy. Note that
@@ -91,20 +92,10 @@ HIDDEN int chooseFrame() {
   return frameIdx;
 }
 
-/*
- * Function: uTLB_ExceptionHandler
- * Purpose: Implements the TLB exception handler (Pager) for the Support Level. This routine:
- *          1. Retrieves the current U-proc's support structure.
- *          2. Determines the cause of the TLB exception.
- *          3. If the exception is a TLB-Modification, it invokes the program trap handler.
- *          4. Locks the Swap Pool and identifies the missing page from the faulting address.
- *          5. Allocates a frame, and if the frame is already occupied, swaps out the old page:
- *             - Updates the old process’s page table and TLB.
- *             - Writes the old page to the backing store.
- *          6. Reads the required page from the backing store into the allocated frame.
- *          7. Updates the Swap Pool table, the U-proc’s page table, and the TLB atomically.
- *          8. Unlocks the Swap Pool and restarts the faulting process.
- * Parameters: None.
+/**
+ * @brief TLB exception handler (Pager) for the Support Level. The handler
+ * ensures TLB and page table updates are atomic and correctly ordered to
+ * prevent data races, stale access, or inconsistency across interrupts.
  */
 void uTLB_ExceptionHandler() {
   /* 1. Get Support Structure via SYS8 */
@@ -164,7 +155,8 @@ void uTLB_ExceptionHandler() {
     /* 8.(c). Write to old process's backing store */
     memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
     int oldPageIdx = oldVpn % MAXPAGES;
-    if (flashOperation(oldAsid - 1, oldPageIdx, frameAddr, FLASH_WRITEBLK) < 0) {
+    if (flashOperation(oldAsid - 1, oldPageIdx, frameAddr, FLASH_WRITEBLK) <
+        0) {
       SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
       programTrapHandler(sup); /* I/O error as trap */
     }
@@ -172,7 +164,8 @@ void uTLB_ExceptionHandler() {
 
   /* 9. Read current process's page p into frame i */
   memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
-  if (flashOperation(sup->sup_asid - 1, pageIdx, frameAddr, FLASH_READBLK) < 0) {
+  if (flashOperation(sup->sup_asid - 1, pageIdx, frameAddr, FLASH_READBLK) <
+      0) {
     SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
     programTrapHandler(sup); /* I/O error as trap */
   }

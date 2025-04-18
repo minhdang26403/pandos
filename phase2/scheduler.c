@@ -1,18 +1,16 @@
-/************************** SCHEDULER.C ******************************
+/**
+ * @file scheduler.c
+ * @author Dang Truong, Loc Pham
+ * @brief This module implements the scheduler functionality for Phase 2. It is
+ * responsible for dispatching processes from the ready queue using a
+ * round-robin scheduling algorithm with a time slice of 5 milliseconds.
+ * Additionally, it provides critical wrapper functions for context switching
+ * using the LDST and LDCXT instructions.
+ * @date 2025-04-17
  *
- * The Scheduler Module.
+ * @copyright Copyright (c) 2025
  *
- * Description:
- *   This module implements the scheduler functionality for Phase 2.
- *   It is responsible for dispatching processes from the ready queue using a
- *   round-robin scheduling algorithm with a time slice of 5 milliseconds.
- *   Additionally, it provides critical wrapper functions for context switching
- *   using the LDST and LDCXT instructions.
- *
- * Written by Dang Truong, Loc Pham
  */
-
-/***************************************************************/
 
 #include "../h/scheduler.h"
 
@@ -20,70 +18,54 @@
 #include "../h/pcb.h"
 #include "umps3/umps/libumps.h"
 
-/* Global variable to track when the current process's quantum started */
+/* Timestamp (in microseconds) when the current process's time slice began. */
 cpu_t quantumStartTime = 0;
 
 /**
- * Function: switchContext
- * -----------------------
- * Purpose:
- *   Performs a context switch by loading the specified processor state using
- *   the LDST instruction. LDST is a critical and dangerous instruction,
- *   so every call to context switch should be performed through this function.
+ * @brief Load a new processor state using the LDST instruction.
  *
- * Parameters:
- *   state - A pointer to a state_t structure representing the processor state
- *           to be loaded for the new context.
+ * LDST replaces the current process context with the one specified by `state`.
+ * This is a privileged operation that does not return if successful.
+ * Should only be invoked via this wrapper for safety and clarity.
  *
- * Returns:
- *   This function does not return if the context switch is successful.
+ * @param state Pointer to the processor state to load.
+ * @return This function does not return; control is transferred to the new
+ * state.
  */
 void switchContext(state_t *state) { LDST(state); }
 
 /**
- * Function: loadContext
- * ---------------------
- * Purpose:
- *   Atomically loads a new processor context using the LDCXT instruction.
- *   LDCXT is a critical kernel-mode operation, so this function serves as
- *   a centralized wrapper for LDCXT to switch to a new context.
+ * @brief Atomically load a new processor context using LDCXT.
  *
- * Parameters:
- *   context: A pointer to context_t that contains the following fields:
- *    - c_stackPtr: The new stack pointer value.
- *    - c_status:   The new status register value.
- *    - c_pc:       The new program counter value.
+ * Loads a full processor context, including stack pointer, status register,
+ * and program counter. Used when passing control to support-level exception
+ * handlers.
  *
- * Returns:
- *   This function does not return if the context load is successful.
+ * @param context Pointer to the context structure to load.
+ * @return This function does not return; control is transferred to the new
+ * context.
  */
 void loadContext(context_t *context) {
   LDCXT(context->c_stackPtr, context->c_status, context->c_pc);
 }
 
 /**
- * Function: scheduler
- * -------------------
- * Purpose:
- *   Implements the core scheduling functionality of the Nucleus. This function:
- *     - Removes the next process from the ready queue.
- *     - Handles different scenarios where the ready queue is empty:
- *         * If no processes remain, HALT is invoked.
- *         * If there are processes but they are all blocked,
- *           it enables global interrupts, disables the Processor Local Timer (PLT),
- *           and waits for a device interrupt.
- *         * Otherwise, PANIC is invoked in case of a deadlock or abnormal state.
- *     - Sets the selected process as the current process.
- *     - Starts its quantum by recording the start time and setting a 5-millisecond
- *       timer.
- *     - Performs a context switch to transfer control to the selected process.
+ * @brief Round-robin scheduler for selecting and dispatching processes.
  *
- * Parameters:
- *   None.
+ * Removes the next process from the ready queue and:
+ * - If no processes exist, halts the system (successful termination).
+ * - If all processes are blocked, enables interrupts and disables the PLT, then
+ * waits for a device interrupt.
+ * - Otherwise, invokes PANIC due to a deadlock or invalid state.
  *
- * Returns:
- *   This function does not return, as control is transferred to a process via
- *   a context switch.
+ * If a ready process is found:
+ * - Sets it as `currentProc`
+ * - Records the current time as `quantumStartTime`
+ * - Loads the processor timer with a 5ms time slice
+ * - Performs a context switch to the selected process
+ *
+ * @return This function does not return; control is passed via switchContext or
+ * HALT/WAIT/PANIC.
  */
 void scheduler() {
   pcb_PTR p = removeProcQ(&readyQueue);

@@ -1,24 +1,21 @@
-/************************** INITIAL.C ******************************
+/**
+ * @file initial.c
+ * @author Dang Truong, Loc Pham
+ * @brief This module implements the Nucleus Initialization routines for
+ * Phase 2. It sets up the environment needed formultiprogramming by:
+ * 1. Defining relevant global variables for Nucleus.
+ * 2. Populating the Processor 0 Pass Up Vector with the appropriate handler
+ * addresses and stack pointers.
+ * 3. Initializing the PCB free list and the Active Semaphore List (ASL).
+ * 4. Setting up Nucleus maintained global variables.
+ * 5. Loading the system-wide Interval Timer with a 100-millisecond tick.
+ * 6. Instantiating an initial test process with the proper processor state.
+ * 7. Calling the scheduler to dispatch processes.
+ * @date 2025-04-17
  *
- * The Nucleus Initialization Module.
+ * @copyright Copyright (c) 2025
  *
- * Description:
- *   This module implements the Nucleus Initialization routines for Phase 2. It
- * sets up the environment needed formultiprogramming by:
- *     - Defining relevant global variables for Nucleus (procCnt, softBlockCnt,
- *       readyQueue, currentProc, deviceSem).
- *     - Populating the Processor 0 Pass Up Vector with the appropriate handler
- *       addresses and stack pointers.
- *     - Initializing the PCB free list and the Active Semaphore List (ASL).
- *     - Setting up Nucleus maintained global variables
- *     - Loading the system-wide Interval Timer with a 100-millisecond tick.
- *     - Instantiating an initial test process with the proper processor state.
- *     - Calling the scheduler to dispatch processes.
- *
- * Written by Dang Truong, Loc Pham
  */
-
-/***************************************************************/
 
 #include "../h/initial.h"
 
@@ -44,31 +41,20 @@ pcb_PTR currentProc; /* Pointer to the pcb that is in the "running" state */
 int deviceSem[NUMDEVICES +
               1]; /* One additional semaphore to support the Pseudo-clock */
 
-/*
- * Function: main
- * --------------------
- * Purpose:
- *   Performs the Nucleus initialization for Phase 2.
- *   This includes:
- *     - Populating the Processor 0 Pass Up Vector with TLB refill and exception
- *       handler addresses and corresponding stack pointers.
- *     - Initializing the PCB free list and Active Semaphore List.
- *     - Setting the Nucleus global variables (process count, soft-block count,
- *       ready queue, and current process) to their initial states.
- *     - Loading the system-wide Interval Timer with a 100 millisecond interval.
- *     - Creating an initial test process, configuring its processor state with:
- *         * Interrupts enabled.
- *         * Processor Local Timer enabled.
- *         * Kernel mode activated.
- *         * Stack pointer set to the top of RAM.
- *         * Program counter (and t9) set to the test function.
- *     - Invoking the scheduler to start process dispatching.
+/**
+ * @brief Nucleus initialization for Phase 2.
  *
- * Parameters:
- *   None.
+ * Sets up the OS kernel environment to support multiprogramming:
+ * - Sets TLB and exception handlers in the Pass Up Vector.
+ * - Initializes the PCB free list and Active Semaphore List (ASL).
+ * - Resets global variables: process count, soft-block count, ready-process
+ * queue, current process pointer, device semaphore.
+ * - Loads the interval timer with a 100ms tick.
+ * - Creates an initial process with kernel-mode state, stack pointer set to
+ * RAMTOP, and entry point set to `init()`.
+ * - Calls the scheduler to begin process execution.
  *
- * Returns:
- *   This function does not return.
+ * @return This function does not return; control passes to the scheduler.
  */
 void main() {
   /* 2. Populate the Processor 0 Pass Up Vector */
