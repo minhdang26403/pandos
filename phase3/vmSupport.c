@@ -72,14 +72,18 @@ HIDDEN int chooseFrame() {
   static int nextFrameIdx = 0;
 
   /* First search for an unoccupied frame */
-  int frameIdx;
-  for (frameIdx = 0; frameIdx < SWAP_POOL_SIZE; frameIdx++) {
+  int frameIdx = 0;
+  int found = FALSE;
+  while (frameIdx < SWAP_POOL_SIZE && !found) {
     if (swapPoolTable[frameIdx].spte_asid == ASID_UNOCCUPIED) {
-      break;
+      found = TRUE;
+    } else {
+      frameIdx++;
     }
   }
+
   /* If no free frame is found, fall back to FIFO (round-robin) */
-  if (frameIdx == SWAP_POOL_SIZE) {
+  if (!found) {
     frameIdx = nextFrameIdx;
     nextFrameIdx = (nextFrameIdx + 1) % SWAP_POOL_SIZE;
   }

@@ -128,8 +128,8 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
   /* Send each character up to len */
   char *s = (char *)virtAddr;
   int devStatus = READY; /* Default for len = 0 */
-  unsigned i;
-  for (i = 0; i < len; i++) {
+  unsigned i = 0;
+  while (i < len && devStatus == READY) {
     /* Prepare data */
     printer->d_data0 = s[i];
 
@@ -141,9 +141,7 @@ HIDDEN void sysWriteToPrinter(state_t *excState, support_t *sup) {
     devStatus = SYSCALL(WAITIO, PRNTINT, devNum, 0);
     setSTATUS(procStatus); /* Reenable interrupts */
 
-    if (devStatus != READY) {
-      break;
-    }
+    i++;
   }
 
   if (devStatus == READY) {
@@ -186,8 +184,8 @@ HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
   /* Send each character up to len */
   char *s = (char *)virtAddr;
   int devStatus = CHAR_TRANSMITTED; /* Default for len = 0 */
-  unsigned i;
-  for (i = 0; i < len; i++) {
+  unsigned i = 0;
+  while (i < len && (devStatus & TERMINT_STATUS_MASK) == CHAR_TRANSMITTED) {
     /* Disable interrupts to ensure writing the COMMAND field and executing SYS5
      * (WAITIO) happens atomically */
     unsigned int procStatus = getSTATUS();
@@ -196,9 +194,7 @@ HIDDEN void sysWriteToTerminal(state_t *excState, support_t *sup) {
     devStatus = SYSCALL(WAITIO, TERMINT, devNum, FALSE);
     setSTATUS(procStatus); /* Reenable interrupts */
 
-    if ((devStatus & TERMINT_STATUS_MASK) != CHAR_TRANSMITTED) {
-      break;
-    }
+    i++;
   }
 
   if ((devStatus & TERMINT_STATUS_MASK) == CHAR_TRANSMITTED) {
@@ -235,8 +231,9 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
   /* Read each character up to len */
   char *buffer = (char *)virtAddr;
   int devStatus;
+  int done = FALSE;
 
-  while (TRUE) {
+  while (!done) {
     /* Disable interrupts to ensure writing the COMMAND field and executing SYS5
      * (WAITIO) happens atomically */
     unsigned int procStatus = getSTATUS();
@@ -255,10 +252,10 @@ HIDDEN void sysReadFromTerminal(state_t *excState, support_t *sup) {
       *buffer = c;
       buffer++;
       if (c == '\n') {
-        break;
+        done = TRUE;
       }
     } else {
-      break;
+      done = TRUE;
     }
   }
 
