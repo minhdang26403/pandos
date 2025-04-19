@@ -16,6 +16,7 @@
 #include "../h/const.h"
 #include "../h/deviceSupportDMA.h"
 #include "../h/exceptions.h"
+#include "../h/initProc.h"
 #include "../h/initial.h"
 #include "../h/scheduler.h"
 #include "../h/sysSupport.h"
@@ -181,8 +182,26 @@ void uTLB_ExceptionHandler() {
     /* 8.(c). Write to old process's backing store */
     memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
     int oldPageIdx = oldVpn % MAXPAGES;
-    if (flashOperation(oldAsid - 1, oldPageIdx, frameAddr, FLASH_WRITEBLK) <
-        0) {
+    int diskDevIdx = (DISKINT - DISKINT)*DEVPERINT + BACKING_STORE_DISK;
+    
+    /* Gain exclusive access to device register and DMA buffer */
+    SYSCALL(PASSEREN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
+    
+    /* For disk write operations, copy data from user space to DMA buffer */
+    memaddr diskBuf = DISK_DMA_BASE + BACKING_STORE_DISK * PAGESIZE;
+    memcopy((void*)diskBuf, (void*)frameAddr, PAGESIZE);
+
+    int diskStatus = diskOperation(
+      BACKING_STORE_DISK,
+      (oldAsid - 1)*MAXPAGES + oldPageIdx,
+      diskBuf,
+      DISK_WRITEBLK
+    );
+    
+    /* Release device semaphore */
+    SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
+
+    if (diskStatus < 0) {
       SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
       programTrapHandler(sup); /* I/O error as trap */
     }
@@ -190,8 +209,29 @@ void uTLB_ExceptionHandler() {
 
   /* 9. Read current process's page p into frame i */
   memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
-  if (flashOperation(sup->sup_asid - 1, pageIdx, frameAddr, FLASH_READBLK) <
-      0) {
+  int diskDevIdx = (DISKINT - DISKINT)*DEVPERINT + BACKING_STORE_DISK;
+
+  /* Gain exclusive access to device register and DMA buffer */
+  SYSCALL(PASSEREN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
+
+  memaddr diskBuf = DISK_DMA_BASE + BACKING_STORE_DISK * PAGESIZE;
+
+  int diskStatus = diskOperation(
+    BACKING_STORE_DISK,
+    (sup->sup_asid - 1)*MAXPAGES + pageIdx,
+    diskBuf,
+    DISK_READBLK
+  );
+  
+  /* For successful disk reads, copy data from DMA buffer to user space */
+  if (diskStatus == READY) {
+    memcopy((void*)frameAddr, (void*)diskBuf, PAGESIZE);
+  }
+
+  /* Release device semaphore */
+  SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
+
+  if (diskStatus < 0) {
     SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
     programTrapHandler(sup); /* I/O error as trap */
   }
