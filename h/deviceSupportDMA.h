@@ -22,5 +22,6 @@ void sysDiskWrite(state_t *excState, support_t *sup);
 void sysDiskRead(state_t *excState, support_t *sup);
 void sysFlashWrite(state_t *excState, support_t *sup);
 void sysFlashRead(state_t *excState, support_t *sup);
+void memcopy(void *dest, const void *src, unsigned int size);
 
 #endif
