@@ -103,23 +103,35 @@ HIDDEN void initSupportStruct(support_t *sup, int asid) {
 }
 
 HIDDEN void initBackingStore() {
-  /* For each U‑proc ASID, copy its flash blocks 0..30 into DISK0 */
-  int asid;
-  for (asid = 1; asid <= MAX_UPROCS; asid++) {
-    int flashNum = asid - 1;
-
+  /* Copy each U-proc's execution image from its flash device to DISK0 */
+  int flashNum;
+  for (flashNum = 0; flashNum < DEVPERINT; flashNum++) {
     /* Compute physical DMA buffer address for this flash */
     memaddr dmaBuf = FLASH_DMA_BASE + flashNum * PAGESIZE;
 
-    /* For each of the 31 pages of .text/.data. Ignore initially empty stack
-     * page. */
-    int block;
-    for (block = 0; block < TEXT_PAGE_COUNT; block++) {
-      if (flashOperation(flashNum, block, dmaBuf, FLASH_READBLK) < 0) {
+    /* Read the first block of each flash device to examine the U-proc's header
+     * information */
+    if (flashOperation(flashNum, 0, dmaBuf, FLASH_READBLK) < 0) {
+      SYSCALL(TERMINATEPROCESS, 0, 0, 0);
+    }
+
+    /* Extract the .text and .data file sizes from the header */
+    int textFileSize = *(int *)(dmaBuf + TEXT_FILE_SIZE_OFFSET);
+    int dataFileSize = *(int *)(dmaBuf + DATA_FILE_SIZE_OFFSET);
+
+    /* Compute the number of pages containing the .text and .data sections */
+    int numPages = (textFileSize + dataFileSize) / PAGESIZE;
+
+    /* Only copy the blocks containing the U-proc's .text and .data. The
+     * remainder of the U-proc's logical address space is uninitialized and need
+     * not be (unnecessarily) copied from the flash device to DISK0 */
+    int blockNum;
+    for (blockNum = 0; blockNum < numPages; blockNum++) {
+      if (flashOperation(flashNum, blockNum, dmaBuf, FLASH_READBLK) < 0) {
         SYSCALL(TERMINATEPROCESS, 0, 0, 0);
       }
 
-      int sectorNum = (asid - 1) * MAXPAGES + block;
+      int sectorNum = flashNum * MAXPAGES + blockNum;
       if (diskOperation(BACKING_DISK, sectorNum, dmaBuf, DISK_WRITEBLK) < 0) {
         SYSCALL(TERMINATEPROCESS, 0, 0, 0);
       }
@@ -157,7 +169,7 @@ void init() {
   /* Initialize the free list of Support Structures */
   initSupportFreeList();
 
-  /* Initialize the backing store (DISK0) by copying execution images of U-procs
+  /* Initialize the backing store (DISK0) by copying U-proc's execution images
    * from flash devices */
   initBackingStore();
 

@@ -179,7 +179,10 @@
 
 #define VPN_TEXT_BASE   0x80000                     /* Base VPN for .text/.data */
 #define VPN_STACK       0xBFFFF                     /* VPN for stack page */
-#define TEXT_PAGE_COUNT 31                          /* Number of .text/.data pages */
+
+/* constant for .aout file format */
+#define TEXT_FILE_SIZE_OFFSET   0x0014
+#define DATA_FILE_SIZE_OFFSET   0x0024
 
 /*
 For a 32-bit EntryLo, the format is:
@@ -236,8 +239,8 @@ For a 32-bit EntryLo, the format is:
 #define FLASHREAD         17    /* Read from Flash */
 
 /* Device-specific constants */
-#define PRINTER_MAXLEN   128    /* Max length for SYS11 */
-#define TERMINAL_MAXLEN  128    /* Max length for SYS12 */
-#define BACKING_DISK    0 /* DISK0 for backing store */
+#define PRINTER_MAXLEN    128    /* Max length for SYS11 */
+#define TERMINAL_MAXLEN   128    /* Max length for SYS12 */
+#define BACKING_DISK      0      /* DISK0 is used for backing store */
 
 #endif
