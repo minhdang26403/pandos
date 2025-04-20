@@ -44,58 +44,16 @@ HIDDEN void initUProcState(state_t *state, int asid) {
 }
 
 /**
- * @brief Initialize a U-proc's page table according to its executable format.
- *
- * Reads the executable header from flash (block 0), extracts the .text memory
- * size, calculates the number of required pages, and configures the PTEs
- * accordingly:
- * - .text pages are clean (not writable)
- * - data and stack pages are writable (dirty bit set)
+ * @brief Initialize a U-proc's page table with all writable pages.
  *
  * @param sup Pointer to the U-proc's support structure containing its page
  * table.
  * @param asid Address Space Identifier (ASID) for the U-proc.
  */
 HIDDEN void initPageTable(support_t *sup, int asid) {
-  /* Gain exclusive access to device register and DMA buffer */
-  int diskDevIdx = (DISKINT - DISKINT) * DEVPERINT + BACKING_STORE_DISK;
-  SYSCALL(PASSEREN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
-
-  /* Compute physical DMA buffer address for this disk */
-  memaddr dmaBuf = DISK_DMA_BASE + BACKING_STORE_DISK * PAGESIZE;
-
-  /* Read the header from backing store (DISK0) into diskBuf */
-  unsigned int sectorNum = (asid - 1) * MAXPAGES;
-  int status =
-      diskOperation(BACKING_STORE_DISK, sectorNum, dmaBuf, DISK_READBLK);
-
-  /* Release device semaphore */
-  SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
-
-  if (status < 0) {
-    programTrapHandler(sup);
-  }
-
-  /* Extract the .text memory size from the header. The header field for .text
-   * Memory Size is at offset 0x000C. */
-  unsigned int textMemSize = *(unsigned int *)(dmaBuf + 0x000C);
-
-  /* Compute the number of pages required for the .text section. Rounding up if
-   * necessary. */
-  int textPages = (textMemSize + PAGESIZE - 1) / PAGESIZE;
-
-  /**
-   * Initialize the first 31 entries (text and data pages). Turn off dirty bit
-   * for .text pages and turn on for others.
-   */
+  /* Initialize the first 31 entries (text and data pages) */
   int i;
-  for (i = 0; i < textPages; i++) {
-    sup->sup_privatePgTbl[i].pte_entryHI =
-        ((VPN_TEXT_BASE + i) << VPN_SHIFT) | (asid << ASID_SHIFT);
-    sup->sup_privatePgTbl[i].pte_entryLO = ZERO_MASK;
-  }
-
-  for (; i < STACKPAGE; i++) {
+  for (i = 0; i < STACKPAGE; i++) {
     sup->sup_privatePgTbl[i].pte_entryHI =
         ((VPN_TEXT_BASE + i) << VPN_SHIFT) | (asid << ASID_SHIFT);
     sup->sup_privatePgTbl[i].pte_entryLO = PTE_DIRTY;
@@ -164,7 +122,7 @@ HIDDEN void initBackingStore() {
 
       int sectorNum = (asid - 1) * MAXPAGES + block;
       status =
-          diskOperation(BACKING_STORE_DISK, sectorNum, dmaBuf, DISK_WRITEBLK);
+          diskOperation(BACKING_DISK, sectorNum, dmaBuf, DISK_WRITEBLK);
       if (status != READY) {
         SYSCALL(TERMINATEPROCESS, 0, 0, 0);
       }

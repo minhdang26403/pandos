@@ -238,6 +238,6 @@ For a 32-bit EntryLo, the format is:
 /* Device-specific constants */
 #define PRINTER_MAXLEN   128    /* Max length for SYS11 */
 #define TERMINAL_MAXLEN  128    /* Max length for SYS12 */
-#define BACKING_STORE_DISK    0 /* DISK0 for backing store */
+#define BACKING_DISK    0 /* DISK0 for backing store */
 
 #endif

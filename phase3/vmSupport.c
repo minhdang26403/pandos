@@ -182,19 +182,9 @@ void uTLB_ExceptionHandler() {
     /* 8.(c). Write to old process's backing store */
     memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
     int oldPageIdx = oldVpn % MAXPAGES;
-    int diskDevIdx = (DISKINT - DISKINT) * DEVPERINT + BACKING_STORE_DISK;
-
-    /* Gain exclusive access to device register and DMA buffer */
-    SYSCALL(PASSEREN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
-
     int sectorNum = (oldAsid - 1) * MAXPAGES + oldPageIdx;
-    int diskStatus =
-        diskOperation(BACKING_STORE_DISK, sectorNum, frameAddr, DISK_WRITEBLK);
 
-    /* Release device semaphore */
-    SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
-
-    if (diskStatus < 0) {
+    if (diskOperation(BACKING_DISK, sectorNum, frameAddr, DISK_WRITEBLK) < 0) {
       SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
       programTrapHandler(sup); /* I/O error as trap */
     }
@@ -202,19 +192,9 @@ void uTLB_ExceptionHandler() {
 
   /* 9. Read current process's page p into frame i */
   memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
-  int diskDevIdx = (DISKINT - DISKINT) * DEVPERINT + BACKING_STORE_DISK;
-
-  /* Gain exclusive access to device register and DMA buffer */
-  SYSCALL(PASSEREN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
-
   int sectorNum = (sup->sup_asid - 1) * MAXPAGES + pageIdx;
-  int diskStatus =
-      diskOperation(BACKING_STORE_DISK, sectorNum, frameAddr, DISK_READBLK);
 
-  /* Release device semaphore */
-  SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
-
-  if (diskStatus < 0) {
+  if (diskOperation(BACKING_DISK, sectorNum, frameAddr, DISK_READBLK) < 0) {
     SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
     programTrapHandler(sup); /* I/O error as trap */
   }
