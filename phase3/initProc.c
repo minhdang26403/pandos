@@ -57,22 +57,17 @@ HIDDEN void initUProcState(state_t *state, int asid) {
  * @param asid Address Space Identifier (ASID) for the U-proc.
  */
 HIDDEN void initPageTable(support_t *sup, int asid) {
-  char headerBuf[PAGESIZE];
-
   /* Gain exclusive access to device register and DMA buffer */
-  int diskDevIdx = (DISKINT - DISKINT)*DEVPERINT + BACKING_STORE_DISK;
+  int diskDevIdx = (DISKINT - DISKINT) * DEVPERINT + BACKING_STORE_DISK;
   SYSCALL(PASSEREN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
 
   /* Compute physical DMA buffer address for this disk */
-  memaddr diskBuf = DISK_DMA_BASE + BACKING_STORE_DISK * PAGESIZE;
+  memaddr dmaBuf = DISK_DMA_BASE + BACKING_STORE_DISK * PAGESIZE;
 
   /* Read the header from backing store (DISK0) into diskBuf */
-  int status = diskOperation(BACKING_STORE_DISK, (asid - 1)*MAXPAGES, diskBuf, DISK_READBLK);
-  
-  /* For successful disk reads, copy data from DMA buffer to user space */
-  if (status == READY) {
-    memcopy((void*)headerBuf, (void*)diskBuf, PAGESIZE);
-  }
+  unsigned int sectorNum = (asid - 1) * MAXPAGES;
+  int status =
+      diskOperation(BACKING_STORE_DISK, sectorNum, dmaBuf, DISK_READBLK);
 
   /* Release device semaphore */
   SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
@@ -83,7 +78,7 @@ HIDDEN void initPageTable(support_t *sup, int asid) {
 
   /* Extract the .text memory size from the header. The header field for .text
    * Memory Size is at offset 0x000C. */
-  unsigned int textMemSize = *(unsigned int *)(headerBuf + 0x000C);
+  unsigned int textMemSize = *(unsigned int *)(dmaBuf + 0x000C);
 
   /* Compute the number of pages required for the .text section. Rounding up if
    * necessary. */
@@ -156,30 +151,20 @@ HIDDEN void initBackingStore() {
     int flashNum = asid - 1;
 
     /* Compute physical DMA buffer address for this flash */
-    memaddr flashBuf = FLASH_DMA_BASE + flashNum * PAGESIZE;
-    int flashDevIdx = (FLASHINT - DISKINT)*DEVPERINT + flashNum;
-    int diskDevIdx  = (DISKINT - DISKINT)*DEVPERINT + BACKING_STORE_DISK;
+    memaddr dmaBuf = FLASH_DMA_BASE + flashNum * PAGESIZE;
 
-    /* For each of the 31 pages of .text/.data. Ignore initially empty stack page. */
+    /* For each of the 31 pages of .text/.data. Ignore initially empty stack
+     * page. */
     int block;
     for (block = 0; block < TEXT_PAGE_COUNT; block++) {
-      /* 1) Read from the per‑proc flash */
-      SYSCALL(PASSEREN, (int)&supportDeviceSem[flashDevIdx], 0, 0);
-      int status = flashOperation(flashNum, block, flashBuf, FLASH_READBLK);
-      SYSCALL(VERHOGEN, (int)&supportDeviceSem[flashDevIdx],0,0);
+      int status = flashOperation(flashNum, block, dmaBuf, FLASH_READBLK);
       if (status != READY) {
         SYSCALL(TERMINATEPROCESS, 0, 0, 0);
       }
 
-      /* 2) Copy flash buf into DISK0’s DMA buf */
-      memaddr diskBuf = DISK_DMA_BASE + BACKING_STORE_DISK * PAGESIZE;
-      memcopy((void*)diskBuf, (void*)flashBuf, PAGESIZE);
-
-      /* 3) Write to DISK0 at sector = (asid‑1)*32 + block */
-      int targetSec = (asid-1)*MAXPAGES + block;
-      SYSCALL(PASSEREN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
-      status = diskOperation(BACKING_STORE_DISK, targetSec, diskBuf, DISK_WRITEBLK);
-      SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
+      int sectorNum = (asid - 1) * MAXPAGES + block;
+      status =
+          diskOperation(BACKING_STORE_DISK, sectorNum, dmaBuf, DISK_WRITEBLK);
       if (status != READY) {
         SYSCALL(TERMINATEPROCESS, 0, 0, 0);
       }
@@ -217,7 +202,8 @@ void init() {
   /* Initialize the free list of Support Structures */
   initSupportFreeList();
 
-  /* Initialize the backing store (DISK0) by copying execution images of U-procs from flash devices */
+  /* Initialize the backing store (DISK0) by copying execution images of U-procs
+   * from flash devices */
   initBackingStore();
 
   /* Launch U-procs */

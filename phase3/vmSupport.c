@@ -182,22 +182,15 @@ void uTLB_ExceptionHandler() {
     /* 8.(c). Write to old process's backing store */
     memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
     int oldPageIdx = oldVpn % MAXPAGES;
-    int diskDevIdx = (DISKINT - DISKINT)*DEVPERINT + BACKING_STORE_DISK;
-    
+    int diskDevIdx = (DISKINT - DISKINT) * DEVPERINT + BACKING_STORE_DISK;
+
     /* Gain exclusive access to device register and DMA buffer */
     SYSCALL(PASSEREN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
-    
-    /* For disk write operations, copy data from user space to DMA buffer */
-    memaddr diskBuf = DISK_DMA_BASE + BACKING_STORE_DISK * PAGESIZE;
-    memcopy((void*)diskBuf, (void*)frameAddr, PAGESIZE);
 
-    int diskStatus = diskOperation(
-      BACKING_STORE_DISK,
-      (oldAsid - 1)*MAXPAGES + oldPageIdx,
-      diskBuf,
-      DISK_WRITEBLK
-    );
-    
+    int sectorNum = (oldAsid - 1) * MAXPAGES + oldPageIdx;
+    int diskStatus =
+        diskOperation(BACKING_STORE_DISK, sectorNum, frameAddr, DISK_WRITEBLK);
+
     /* Release device semaphore */
     SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
 
@@ -209,24 +202,14 @@ void uTLB_ExceptionHandler() {
 
   /* 9. Read current process's page p into frame i */
   memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
-  int diskDevIdx = (DISKINT - DISKINT)*DEVPERINT + BACKING_STORE_DISK;
+  int diskDevIdx = (DISKINT - DISKINT) * DEVPERINT + BACKING_STORE_DISK;
 
   /* Gain exclusive access to device register and DMA buffer */
   SYSCALL(PASSEREN, (int)&supportDeviceSem[diskDevIdx], 0, 0);
 
-  memaddr diskBuf = DISK_DMA_BASE + BACKING_STORE_DISK * PAGESIZE;
-
-  int diskStatus = diskOperation(
-    BACKING_STORE_DISK,
-    (sup->sup_asid - 1)*MAXPAGES + pageIdx,
-    diskBuf,
-    DISK_READBLK
-  );
-  
-  /* For successful disk reads, copy data from DMA buffer to user space */
-  if (diskStatus == READY) {
-    memcopy((void*)frameAddr, (void*)diskBuf, PAGESIZE);
-  }
+  int sectorNum = (sup->sup_asid - 1) * MAXPAGES + pageIdx;
+  int diskStatus =
+      diskOperation(BACKING_STORE_DISK, sectorNum, frameAddr, DISK_READBLK);
 
   /* Release device semaphore */
   SYSCALL(VERHOGEN, (int)&supportDeviceSem[diskDevIdx], 0, 0);

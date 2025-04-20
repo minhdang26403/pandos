@@ -6,7 +6,7 @@
 #include "../h/vmSupport.h"
 #include "umps3/umps/libumps.h"
 
-void memcopy(void *dest, const void *src, unsigned int size) {
+HIDDEN void memcopy(void *dest, const void *src, unsigned int size) {
   unsigned char *d = (unsigned char *)dest;
   const unsigned char *s = (const unsigned char *)src;
 
