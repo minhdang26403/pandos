@@ -148,16 +148,13 @@ HIDDEN void sysFlashOperation(state_t *excState, support_t *sup,
     programTrapHandler(sup);
   }
 
-  /* Validate block number is not within the backing store region (0..31).
-   * TODO: If U-procs are switched to use DISK0 as backing store instead of
-   * flash, this check can be relaxed to allow blockNum >= 0.
-   */
+  /* Validate block number */
   int devIdx = (FLASHINT - DISKINT) * DEVPERINT + flashNum;
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
   device_t *flash = &busRegArea->devreg[devIdx];
   unsigned int maxBlock = flash->d_data1;
 
-  if (blockNum < 32 || blockNum >= maxBlock) {
+  if (blockNum >= maxBlock) {
     programTrapHandler(sup);
   }
 
