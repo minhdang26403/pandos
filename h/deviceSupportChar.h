@@ -11,4 +11,10 @@
  *
  */
 
+#include "../h/types.h"
+
+void sysWriteToPrinter(state_t *excState, support_t *sup);
+void sysWriteToTerminal(state_t *excState, support_t *sup);
+void sysReadFromTerminal(state_t *excState, support_t *sup);
+
 #endif

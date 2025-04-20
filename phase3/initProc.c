@@ -115,15 +115,12 @@ HIDDEN void initBackingStore() {
      * page. */
     int block;
     for (block = 0; block < TEXT_PAGE_COUNT; block++) {
-      int status = flashOperation(flashNum, block, dmaBuf, FLASH_READBLK);
-      if (status != READY) {
+      if (flashOperation(flashNum, block, dmaBuf, FLASH_READBLK) < 0) {
         SYSCALL(TERMINATEPROCESS, 0, 0, 0);
       }
 
       int sectorNum = (asid - 1) * MAXPAGES + block;
-      status =
-          diskOperation(BACKING_DISK, sectorNum, dmaBuf, DISK_WRITEBLK);
-      if (status != READY) {
+      if (diskOperation(BACKING_DISK, sectorNum, dmaBuf, DISK_WRITEBLK) < 0) {
         SYSCALL(TERMINATEPROCESS, 0, 0, 0);
       }
     }
