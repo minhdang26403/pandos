@@ -1,3 +1,12 @@
+/**
+ * @file deviceSupportChar.c
+ * @author Dang Truong, Loc Pham
+ * @brief Implements character-device syscalls (terminals & printers):
+ *        SYS11-SYS13 (WRITEPRINTER, WRITETERMINAL, READTERMINAL).
+ * @date 2025-04-21
+ */
+
+
 #include "../h/deviceSupportChar.h"
 
 #include "../h/initProc.h"

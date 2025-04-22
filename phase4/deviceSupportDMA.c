@@ -1,3 +1,13 @@
+/**
+ * @file deviceSupportDMA.c
+ * @author Dang Truong, Loc Pham
+ * @brief Implements Phase 4 DMA support: disk (SYS14/15) and flash (SYS16/17) block I/O.
+ *        Handles DMA buffer setup, mutual exclusion (SYS3/SYS4), low-level seek
+ *        and transfer (SYS5), and user-kernel data copies.
+ * @date 2025-04-21
+ */
+
+
 #include "../h/deviceSupportDMA.h"
 
 #include "../h/initProc.h"
@@ -6,6 +16,13 @@
 #include "../h/vmSupport.h"
 #include "umps3/umps/libumps.h"
 
+/**
+ * @brief Copy a memory region byte-by-byte.
+ *
+ * @param dest Destination buffer.
+ * @param src  Source buffer.
+ * @param size Number of bytes to copy.
+ */
 HIDDEN void memcopy(void *dest, const void *src, unsigned int size) {
   unsigned char *d = (unsigned char *)dest;
   const unsigned char *s = (const unsigned char *)src;
@@ -88,6 +105,20 @@ HIDDEN void sysDiskOperation(state_t *excState, support_t *sup,
   switchContext(excState);
 }
 
+/**
+ * @brief Low-level disk operation: seek + read or write via DMA.
+ * 
+ * 1. Translate 1D sectorNum into cylinder/head/sector via disk->d_data1.
+ * 2. Issue SEEK (d_command=SEEKCYL) with interrupts disabled & wait SYS5.
+ * 3. Set DMA buffer address (d_data0), issue read/write command, wait SYS5.
+ * 4. Restore STATUS and return READY or -error.
+ *
+ * @param diskNum   Disk device number [1..7] (0 reserved for backing store).
+ * @param sectorNum Sector index within [0..maxSector−1].
+ * @param frameAddr Physical RAM address of 4KB DMA buffer.
+ * @param op        DISK_READBLK or DISK_WRITEBLK.
+ * @return OK (0) if I/O completed successfully; otherwise, ERR (-1)
+ */
 int diskOperation(unsigned int diskNum, unsigned int sectorNum,
                   memaddr frameAddr, unsigned int op) {
   unsigned int devIdx = (DISKINT - DISKINT) * DEVPERINT + diskNum;
@@ -129,8 +160,12 @@ int diskOperation(unsigned int diskNum, unsigned int sectorNum,
   return (result == READY) ? result : -result;
 }
 
-/* Shared syscall implementation for SYS16 (Flash_Put) and SYS17 (Flash_Get).
- * Handles DMA setup, user/kernel data copy, and flash I/O.
+/**
+ * @brief Shared handler for SYS16/17 flash I/O. Handles DMA setup, user/kernel data copy, and flash I/O.
+ *
+ * @param excState Saved exception state of U-proc (s_a1=logicalAddr, s_a2=flashNum, s_a3=blockNum).
+ * @param sup      Pointer to U‑proc support structure.
+ * @param op       FLASH_READBLK or FLASH_WRITEBLK.
  */
 HIDDEN void sysFlashOperation(state_t *excState, support_t *sup,
                               unsigned int op) {
@@ -233,12 +268,22 @@ void sysDiskRead(state_t *excState, support_t *sup) {
   sysDiskOperation(excState, sup, DISK_READBLK);
 }
 
-/* SYS16 */
+/**
+ * @brief SYS16: Write one 4KB page to a flash block.
+ *
+ * @param excState the saved exception state
+ * @param sup the support structure of the calling U-proc
+ */
 void sysFlashWrite(state_t *excState, support_t *sup) {
   sysFlashOperation(excState, sup, FLASH_WRITEBLK);
 }
 
-/* SYS17 */
+/**
+ * @brief SYS17: Read one 4KB page from a flash block.
+ *
+ * @param excState the saved exception state
+ * @param sup the support structure of the calling U-proc
+ */
 void sysFlashRead(state_t *excState, support_t *sup) {
   sysFlashOperation(excState, sup, FLASH_READBLK);
 }
