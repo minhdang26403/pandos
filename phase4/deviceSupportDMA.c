@@ -1,12 +1,11 @@
 /**
  * @file deviceSupportDMA.c
  * @author Dang Truong, Loc Pham
- * @brief Implements Phase 4 DMA support: disk (SYS14/15) and flash (SYS16/17) block I/O.
- *        Handles DMA buffer setup, mutual exclusion (SYS3/SYS4), low-level seek
- *        and transfer (SYS5), and user-kernel data copies.
+ * @brief Implements Phase 4 DMA support: disk (SYS14/15) and flash (SYS16/17)
+ * block I/O. Handles DMA buffer setup, mutual exclusion (SYS3/SYS4), low-level
+ * seek and transfer (SYS5), and user-kernel data copies.
  * @date 2025-04-21
  */
-
 
 #include "../h/deviceSupportDMA.h"
 
@@ -106,12 +105,8 @@ HIDDEN void sysDiskOperation(state_t *excState, support_t *sup,
 }
 
 /**
- * @brief Low-level disk operation: seek + read or write via DMA.
- * 
- * 1. Translate 1D sectorNum into cylinder/head/sector via disk->d_data1.
- * 2. Issue SEEK (d_command=SEEKCYL) with interrupts disabled & wait SYS5.
- * 3. Set DMA buffer address (d_data0), issue read/write command, wait SYS5.
- * 4. Restore STATUS and return READY or -error.
+ * @brief Low-level disk operation: seek + read or write via DMA. Note that this
+ * function assumes the caller has already acquired mututal exclusion.
  *
  * @param diskNum   Disk device number [1..7] (0 reserved for backing store).
  * @param sectorNum Sector index within [0..maxSector−1].
@@ -161,9 +156,10 @@ int diskOperation(unsigned int diskNum, unsigned int sectorNum,
 }
 
 /**
- * @brief Shared handler for SYS16/17 flash I/O. Handles DMA setup, user/kernel data copy, and flash I/O.
+ * @brief Shared handler for SYS16/17 flash I/O. Handles DMA setup, user/kernel
+ * data copy, and flash I/O.
  *
- * @param excState Saved exception state of U-proc (s_a1=logicalAddr, s_a2=flashNum, s_a3=blockNum).
+ * @param excState Saved exception state of U-proc.
  * @param sup      Pointer to U‑proc support structure.
  * @param op       FLASH_READBLK or FLASH_WRITEBLK.
  */
@@ -225,7 +221,7 @@ HIDDEN void sysFlashOperation(state_t *excState, support_t *sup,
  * @param flashNum flash device number in [0..7]
  * @param blockNum flash block number (must be valid)
  * @param frameAddr Physical RAM address for the 4KB page (DMA buffer)
- * @param op operation type (either FLASH_READBLK or FLASH_WRITEBLK)
+ * @param op operation type (FLASH_READBLK or FLASH_WRITEBLK)
  * @return OK (0) if I/O completed successfully; otherwise, ERR (-1)
  */
 int flashOperation(unsigned int flashNum, unsigned int blockNum,

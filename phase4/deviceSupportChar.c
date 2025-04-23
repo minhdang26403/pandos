@@ -6,7 +6,6 @@
  * @date 2025-04-21
  */
 
-
 #include "../h/deviceSupportChar.h"
 
 #include "../h/initProc.h"
@@ -18,7 +17,7 @@
 /**
  * @brief Implement WRITEPRINTER syscall for U-procs.
  *
- * - Validates that the string (s_a1, length s_a2) lies entirely within KUSEG.
+ * - Validates that the string lies entirely within KUSEG.
  * - Sends each character to the printer device and waits for acknowledgment.
  * - Sets `s_v0` to the number of characters printed or a negative error code.
  *

@@ -103,7 +103,8 @@ HIDDEN void initSupportStruct(support_t *sup, int asid) {
 }
 
 /**
- * @brief Copy each U-proc's logical image from its flash device to the global backing store disk (DISK0).
+ * @brief Copy each U-proc's logical image from its flash device to the global
+ * backing store disk (DISK0).
  *
  * For each flash device (0-7):
  *   1. Read block 0 into the device's DMA buffer to extract the U-proc header,
