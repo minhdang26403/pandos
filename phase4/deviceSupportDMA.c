@@ -1,12 +1,12 @@
 /**
  * @file deviceSupportDMA.c
  * @author Dang Truong, Loc Pham
- * @brief Implements Phase 4 DMA support: disk (SYS14/15) and flash (SYS16/17)
- * block I/O. Handles DMA buffer setup, mutual exclusion (SYS3/SYS4), low-level
- * seek and transfer (SYS5), and user-kernel data copies.
+ * @brief Implements Phase 4 DMA syscalls: disk write (SYS14), disk read
+ * (SYS15), flash write (SYS16), and flash read (SYS17). Provides DMA buffer
+ * setup, mutual exclusion, low-level seek/transfer, and user–kernel memory
+ * copying.
  * @date 2025-04-21
  */
-
 #include "../h/deviceSupportDMA.h"
 
 #include "../h/initProc.h"
@@ -60,7 +60,8 @@ HIDDEN void sysDiskOperation(state_t *excState, support_t *sup,
    * accessed by user code.
    */
   if (diskNum == 0 || diskNum >= DEVPERINT) {
-    programTrapHandler(sup);
+    excState->s_v0 = ERR;
+    switchContext(excState);
   }
 
   /* Read disk geometry from DATA1 and validate sector number */
@@ -105,14 +106,16 @@ HIDDEN void sysDiskOperation(state_t *excState, support_t *sup,
 }
 
 /**
- * @brief Low-level disk operation: seek + read or write via DMA. Note that this
- * function assumes the caller has already acquired mututal exclusion.
+ * @brief Low-level disk operation: seek + read or write via DMA. Used by the
+ * Pager to interact with the backing store.
  *
- * @param diskNum   Disk device number [1..7] (0 reserved for backing store).
- * @param sectorNum Sector index within [0..maxSector−1].
- * @param frameAddr Physical RAM address of 4KB DMA buffer.
+ * Important: This function assumes the caller already have mutual exclusion.
+ *
+ * @param diskNum   Disk device number [1..7] (0 is reserved).
+ * @param sectorNum Sector index in [0..maxSector−1].
+ * @param frameAddr Physical address of the 4KB DMA buffer.
  * @param op        DISK_READBLK or DISK_WRITEBLK.
- * @return OK (0) if I/O completed successfully; otherwise, ERR (-1)
+ * @return READY (1) on success, or −status on failure.
  */
 int diskOperation(unsigned int diskNum, unsigned int sectorNum,
                   memaddr frameAddr, unsigned int op) {
@@ -176,7 +179,8 @@ HIDDEN void sysFlashOperation(state_t *excState, support_t *sup,
 
   /* Validate flash device number is within valid range [0..7] */
   if (flashNum >= DEVPERINT) {
-    programTrapHandler(sup);
+    excState->s_v0 = ERR;
+    switchContext(excState);
   }
 
   /* Validate block number */
@@ -186,7 +190,8 @@ HIDDEN void sysFlashOperation(state_t *excState, support_t *sup,
   unsigned int maxBlock = flash->d_data1;
 
   if (blockNum >= maxBlock) {
-    programTrapHandler(sup);
+    excState->s_v0 = ERR;
+    switchContext(excState);
   }
 
   /* Compute DMA buffer address in kernel memory for the flash device */
@@ -216,13 +221,15 @@ HIDDEN void sysFlashOperation(state_t *excState, support_t *sup,
 
 /**
  * @brief Perform a flash I/O operation (READ or WRITE) on the specified device
- * and block. Used by the Pager to interact with the backing store.
+ * and block.
+ *
+ * Important: This function assumes the caller already have mutual exclusion.
  *
  * @param flashNum flash device number in [0..7]
  * @param blockNum flash block number (must be valid)
  * @param frameAddr Physical RAM address for the 4KB page (DMA buffer)
  * @param op operation type (FLASH_READBLK or FLASH_WRITEBLK)
- * @return OK (0) if I/O completed successfully; otherwise, ERR (-1)
+ * @return READY (1) on success, or −status on failure.
  */
 int flashOperation(unsigned int flashNum, unsigned int blockNum,
                    memaddr frameAddr, unsigned int op) {
