@@ -102,6 +102,18 @@ HIDDEN void initSupportStruct(support_t *sup, int asid) {
   initPageTable(sup, asid);
 }
 
+/**
+ * @brief Copy each U-proc's logical image from its flash device to the global backing store disk (DISK0).
+ *
+ * For each flash device (0-7):
+ *   1. Read block 0 into the device's DMA buffer to extract the U-proc header,
+ *      obtaining the .text and .data sizes.
+ *   2. Compute the number of 4KB pages containing code+data.
+ *   3. For each block up to that count:
+ *        - Read the block into the DMA buffer.
+ *        - Write the buffer to DISK0 at correct sector.
+ *   4. On any error, terminate the current process (SYS9).
+ */
 HIDDEN void initBackingStore() {
   /* Copy each U-proc's execution image from its flash device to DISK0 */
   int flashNum;
@@ -145,6 +157,7 @@ HIDDEN void initBackingStore() {
  * Performs global support-level setup and launches user processes (U-procs):
  * - Initializes the swap pool and support-level device semaphores.
  * - Sets up the support structure free list.
+ * - Sets up the backing store.
  * - For each U-proc (ASID 1 to MAX_UPROCS):
  *     - Initializes its processor state and support structure.
  *     - Calls CREATEPROCESS to launch the U-proc.
