@@ -39,7 +39,8 @@ all: printerTest.umps strConcat.umps terminalReader.umps asciiArt.umps \
 	terminalTest1.umps terminalTest2.umps terminalTest3.umps terminalTest4.umps \
 	terminalTest5.umps terminalTest6.umps terminalTest7.umps terminalTest8.umps \
 	timeOfDay.umps swapStress.umps bubbleSort.umps comic_typist.umps \
-	diskIOtest.umps delayTest.umps
+	diskIOtest.umps \
+	delayTest.umps
 
 	
 	
