@@ -68,7 +68,7 @@ HIDDEN void initPageTable(support_t *sup, int asid) {
 /**
  * @brief Initialize the support structure for a U-proc.
  *
- * Sets the ASID, configures the exception contexts for TLB refill and general
+ * Sets the ASID, private semaphore, configures the exception contexts for TLB refill and general
  * exceptions with their respective handlers and stack areas, and initializes
  * the private page table using `initPageTable`.
  *
@@ -78,6 +78,9 @@ HIDDEN void initPageTable(support_t *sup, int asid) {
 HIDDEN void initSupportStruct(support_t *sup, int asid) {
   /* Set ASID for the process */
   sup->sup_asid = asid;
+  
+  /* Set to 0 because this is a synchronization semaphore */
+  sup->sup_privSem = 0;
 
   /* Determine RAMTOP */
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
