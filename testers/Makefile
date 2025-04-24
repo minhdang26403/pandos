@@ -40,7 +40,8 @@ all: printerTest.umps strConcat.umps terminalReader.umps asciiArt.umps \
 	terminalTest5.umps terminalTest6.umps terminalTest7.umps terminalTest8.umps \
 	timeOfDay.umps swapStress.umps bubbleSort.umps comic_typist.umps \
 	diskIOtest.umps dmaTest.umps \
-	delayTest.umps
+	delayTest.umps \
+	pvTestA.umps pvTestB.umps
 
 	
 	
