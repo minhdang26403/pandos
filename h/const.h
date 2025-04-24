@@ -237,6 +237,7 @@ For a 32-bit EntryLo, the format is:
 #define DISKREAD          15    /* Read from Disk */
 #define FLASHWRITE        16    /* Write to Flash */
 #define FLASHREAD         17    /* Read from Flash */
+#define DELAY             18    /* Delay the calling U-proc for some number of seconds */
 
 /* Device-specific constants */
 #define PRINTER_MAXLEN    128    /* Max length for SYS11 */

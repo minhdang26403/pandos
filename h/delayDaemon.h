@@ -4,6 +4,6 @@
 #include "../h/types.h"
 
 void initADL();
-int sysDelay(support_t *sup);
+void sysDelay(state_t *excState,support_t *sup);
 
 #endif

@@ -15,6 +15,7 @@
 #include "../h/sysSupport.h"
 
 #include "../h/const.h"
+#include "../h/delayDaemon.h"
 #include "../h/deviceSupportChar.h"
 #include "../h/deviceSupportDMA.h"
 #include "../h/initProc.h"
@@ -129,6 +130,8 @@ HIDDEN void syscallHandler(support_t *sup) {
         sysFlashWrite(excState, sup);
       case FLASHREAD:
         sysFlashRead(excState, sup);
+      case DELAY:
+        sysDelay(excState, sup);
       default:
         break;
     }
