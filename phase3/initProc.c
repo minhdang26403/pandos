@@ -14,6 +14,7 @@
 
 #include "../h/initProc.h"
 
+#include "../h/delayDaemon.h"
 #include "../h/deviceSupportDMA.h"
 #include "../h/exceptions.h"
 #include "../h/supportAlloc.h"
@@ -68,9 +69,9 @@ HIDDEN void initPageTable(support_t *sup, int asid) {
 /**
  * @brief Initialize the support structure for a U-proc.
  *
- * Sets the ASID, private semaphore, configures the exception contexts for TLB refill and general
- * exceptions with their respective handlers and stack areas, and initializes
- * the private page table using `initPageTable`.
+ * Sets the ASID, private semaphore, configures the exception contexts for TLB
+ * refill and general exceptions with their respective handlers and stack areas,
+ * and initializes the private page table using `initPageTable`.
  *
  * @param sup Pointer to the support structure.
  * @param asid Address Space Identifier (ASID) for the U-proc.
@@ -78,9 +79,9 @@ HIDDEN void initPageTable(support_t *sup, int asid) {
 HIDDEN void initSupportStruct(support_t *sup, int asid) {
   /* Set ASID for the process */
   sup->sup_asid = asid;
-  
-  /* Set to 0 because this is a synchronization semaphore */
-  sup->sup_privSem = 0;
+
+  /* Set to 0 since this is a synchronization semaphore */
+  sup->sup_privateSem = 0;
 
   /* Determine RAMTOP */
   devregarea_t *busRegArea = (devregarea_t *)RAMBASEADDR;
@@ -189,6 +190,9 @@ void init() {
   /* Initialize the backing store (DISK0) by copying U-proc's execution images
    * from flash devices */
   initBackingStore();
+
+  /* Initialize the Active Delay List to support Delay Facility */
+  initADL();
 
   /* Launch U-procs */
   int asid;

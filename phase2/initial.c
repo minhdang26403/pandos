@@ -23,7 +23,6 @@
 #include "../h/exceptions.h"
 #include "../h/pcb.h"
 #include "../h/scheduler.h"
-#include "../h/delayDaemon.h"
 
 /* Test function of phase 2 */
 extern void test();
@@ -68,7 +67,6 @@ void main() {
   /* 3. Initialize pcb free list, active semaphore list, active delay list */
   initPcbs();
   initASL();
-  initADL();
 
   /* 4. Initialize all Nuclueus maintained variables */
   procCnt = 0;
