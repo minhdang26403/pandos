@@ -14,6 +14,7 @@
 
 #include "../h/sysSupport.h"
 
+#include "../h/alsl.h"
 #include "../h/const.h"
 #include "../h/delayDaemon.h"
 #include "../h/deviceSupportChar.h"
@@ -132,6 +133,10 @@ HIDDEN void syscallHandler(support_t *sup) {
         sysFlashRead(excState, sup);
       case DELAY:
         sysDelay(excState, sup);
+      case PSEMLOGICAL:
+        sysPasserenLogicalSem(excState, sup);
+      case VSEMLOGICAL:
+        sysVerhogenLogicalSem(excState, sup);
       default:
         break;
     }

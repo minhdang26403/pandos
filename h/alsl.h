@@ -16,5 +16,6 @@
 
 void sysPasserenLogicalSem(state_t *excState, support_t *sup);
 void sysVerhogenLogicalSem(state_t *excState, support_t *sup);
+void initALSL();
 
 #endif
