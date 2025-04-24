@@ -182,6 +182,8 @@
 #define VPN_STACK               0xBFFFF     /* VPN for stack page */
 #define VPN_KUSEGSHARE_BASE     0xC0000     /* Base VPN for shared KUSEG */
 
+#define KUSEGSHARE_BASE         (VPN_KUSEGSHARE_BASE << VPN_SHIFT)
+
 #define IS_SHARED_VPN(vpn)      ((vpn) >= VPN_KUSEGSHARE_BASE)
 
 #define KUSEG_BASE_SECTOR       (MAX_UPROCS * MAXPAGES)   /* Base sector (backing store) of shared pages */

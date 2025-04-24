@@ -14,6 +14,7 @@
 
 #include "../h/initProc.h"
 
+#include "../h/alsl.h"
 #include "../h/deviceSupportDMA.h"
 #include "../h/exceptions.h"
 #include "../h/supportAlloc.h"
@@ -201,6 +202,10 @@ void init() {
   /* Initialize the global page table for the logical address space shared
    * between U-procs  */
   initGlobalPageTable();
+
+  /* Initialize Active Logical Semaphore List to support shared logical address
+   * space between U-procs */
+  initALSL();
 
   /* Launch U-procs */
   int asid;

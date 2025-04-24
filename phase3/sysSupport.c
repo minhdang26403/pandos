@@ -14,6 +14,7 @@
 
 #include "../h/sysSupport.h"
 
+#include "../h/alsl.h"
 #include "../h/const.h"
 #include "../h/deviceSupportChar.h"
 #include "../h/deviceSupportDMA.h"
@@ -129,6 +130,10 @@ HIDDEN void syscallHandler(support_t *sup) {
         sysFlashWrite(excState, sup);
       case FLASHREAD:
         sysFlashRead(excState, sup);
+      case PSEMLOGICAL:
+        sysPasserenLogicalSem(excState, sup);
+      case VSEMLOGICAL:
+        sysVerhogenLogicalSem(excState, sup);
       default:
         break;
     }
