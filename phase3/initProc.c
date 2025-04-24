@@ -26,6 +26,8 @@
 int masterSemaphore;              /* Master semaphore for termination */
 int supportDeviceSem[NUMDEVICES]; /* support level device semaphore */
 
+pte_t globalPgTbl[KUSEGSHARE_PAGES];
+
 /**
  * @brief Initialize the processor state of a U-proc for execution.
  *
@@ -156,6 +158,15 @@ HIDDEN void initBackingStore() {
   }
 }
 
+HIDDEN void initGlobalPageTable() {
+  int i;
+  for (i = 0; i < KUSEGSHARE_PAGES; i++) {
+    /* ASID is set to zero */
+    globalPgTbl[i].pte_entryHI = (VPN_KUSEGSHARE_BASE + i) << VPN_SHIFT;
+    globalPgTbl[i].pte_entryLO = PTE_GLOBAL | PTE_DIRTY;
+  }
+}
+
 /**
  * @brief Support Level instantiator process (Phase 3 entry point).
  *
@@ -193,6 +204,10 @@ void init() {
 
   /* Initialize the Active Delay List for the Delay Facility */
   initADL();
+
+  /* Initialize the global page table for the logical address space shared
+   * between U-procs  */
+  initGlobalPageTable();
 
   /* Launch U-procs */
   int asid;

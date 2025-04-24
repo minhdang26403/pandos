@@ -26,4 +26,9 @@ phase5/*.o
 phase5/kernel*
 phase5/*.umps
 
+phase6/phase6Config
+phase6/*.o
+phase6/kernel*
+phase6/*.umps
+
 testers/*.umps
