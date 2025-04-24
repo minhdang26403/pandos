@@ -126,6 +126,7 @@ typedef struct support_t {
   state_t       sup_exceptState[2];         /* stored excpt states */
   context_t     sup_exceptContext[2];       /* pass up contexts */
   pte_t         sup_privatePgTbl[MAXPAGES]; /* Process Page Table (32 entries) */
+  int           sup_privSem;                /* Process's private semaphore */
 } support_t;
 
 /* process control block type */
