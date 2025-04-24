@@ -136,7 +136,7 @@ HIDDEN void terminateProcHelper(pcb_PTR p) {
  * @return This function does not return; control is transferred to the
  * scheduler.
  */
-HIDDEN void sysTerminateProc(state_t *savedExcState) {
+void sysTerminateProc(state_t *savedExcState) {
   terminateProcHelper(currentProc);
   /* Call the scheduler to find another process to run without pushing the
    * currently running process to the queue again */
@@ -401,43 +401,4 @@ void generalExceptionHandler() {
     /* Unknown exception code */
     PANIC();
   }
-}
-
-/**
- * @brief Handle TLB refill exception (Phase 2 version).
- *
- * Extracts the VPN from the exception state, finds the corresponding PTE in the
- * process's private page table, and writes it into the TLB. If the process
- * lacks a support structure, it is terminated. Execution resumes from the
- * faulting instruction.
- *
- * @return This function does not return; control is transferred via
- * switchContext or termination.
- */
-void uTLB_RefillHandler() {
-  /* Get saved exception state from BIOS Data Page */
-  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
-
-  /* Extract VPN: mask then shift */
-  unsigned int entryHI = savedExcState->s_entryHI;
-  unsigned int vpn = (entryHI & VPN_MASK) >> VPN_SHIFT;
-
-  /* Determine the page table index for the missing entry */
-  unsigned int pageIdx = vpn % MAXPAGES;
-
-  /* Get Page Table entry */
-  support_t *sup = currentProc->p_supportStruct;
-  if (sup == NULL) {
-    /* Consistent with Phase 2 behavior (pass up or die) */
-    sysTerminateProc(savedExcState);
-  }
-  pte_t *pte = &sup->sup_privatePgTbl[pageIdx];
-
-  /* Write to TLB */
-  setENTRYHI(pte->pte_entryHI);
-  setENTRYLO(pte->pte_entryLO);
-  TLBWR();
-
-  /* Return control to the process to retry the instruction */
-  switchContext(savedExcState);
 }

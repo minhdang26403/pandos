@@ -16,5 +16,6 @@
 
 extern int masterSemaphore;
 extern int supportDeviceSem[NUMDEVICES];
+extern pte_t globalPgTbl[KUSEGSHARE_PAGES];
 
 #endif
