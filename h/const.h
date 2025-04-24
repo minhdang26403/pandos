@@ -217,6 +217,8 @@ For a 32-bit EntryLo, the format is:
 /* Macro to read the TOD clock */
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
 
+#define SECOND			1000000     /* Translate from second to microsecond */
+
 /* Nucleus system call codes */
 #define	CREATEPROCESS	    1	    /* create process */
 #define	TERMINATEPROCESS	2	    /* terminate process */

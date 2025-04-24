@@ -191,7 +191,7 @@ void init() {
    * from flash devices */
   initBackingStore();
 
-  /* Initialize the Active Delay List to support Delay Facility */
+  /* Initialize the Active Delay List for the Delay Facility */
   initADL();
 
   /* Launch U-procs */
