@@ -22,12 +22,14 @@ DEFS = ../h/const.h ../h/types.h ../h/pcb.h ../h/asl.h \
 	../h/initial.h ../h/interrupts.h ../h/scheduler.h ../h/exceptions.h \
 	../h/initProc.h ../h/vmSupport.h ../h/sysSupport.h ../h/supportAlloc.h \
 	../h/deviceSupportDMA.h ../h/deviceSupportChar.h \
+	../h/delayDaemon.h \
 	$(INCDIR)/libumps.h Makefile
 
 OBJS = asl.o pcb.o \
        initial.o interrupts.o scheduler.o exceptions.o \
        initProc.o vmSupport.o sysSupport.o supportAlloc.o \
 			 deviceSupportDMA.o deviceSupportChar.o \
+			 delayDaemon.o \
 
 CFLAGS = -ffreestanding -ansi -Wall -c -mips1 -mabi=32 -mfp32 -mno-gpopt -G 0 -fno-pic -mno-abicalls
 
@@ -82,6 +84,9 @@ sysSupport.o: ../phase3/sysSupport.c $(DEFS)
 	$(CC) $(CFLAGS) $<
 
 vmSupport.o: ../phase3/vmSupport.c $(DEFS)
+	$(CC) $(CFLAGS) $<
+
+delayDaemon.o: ../phase5/delayDaemon.c $(DEFS)
 	$(CC) $(CFLAGS) $<
 
 clean:
