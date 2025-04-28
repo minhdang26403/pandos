@@ -43,6 +43,7 @@ HIDDEN logicalSemd_t *headLogicalSemdList();
 
 HIDDEN void insertLogicalSemd(logicalSemd_t *semd);
 HIDDEN void removeLogicalSemd(logicalSemd_t *semd);
+HIDDEN logicalSemd_t *searchLogicalSemd(int *semAddr);
 
 /*====================Global function definitions====================*/
 /**
@@ -101,7 +102,45 @@ void sysPasserenLogicalSem(state_t *excState, support_t *sup) {
  * @param sup The support structure of the calling U-proc.
  */
 void sysVerhogenLogicalSem(state_t *excState, support_t *sup) {
-  /* TODO: fill in the implementation */
+  int *semAddr = (int *)excState->s_a1;
+
+  /* 1. Check whether the semaphore address is in the KUSEGSHARE region */
+  if ((memaddr)semAddr < KUSEGSHARE_BASE ||
+      (memaddr)semAddr >= KUSEGSHARE_BASE + KUSEGSHARE_PAGES * PAGESIZE) {
+    programTrapHandler(sup);
+  }
+
+  /* 2. Increment the semaphore and return control to the U-proc if the semaphore value is > 0 */
+  (*semAddr)++;
+  if (*semAddr > 0) {
+    switchContext(excState);
+  }
+
+  /* 3. Obtain mutual exclusion over the ALSL */
+  SYSCALL(PASSEREN, (int)&ALSL_Semaphore, 0, 0);
+
+  /* 4. Search the ALSL for a matching semaphore address */
+  logicalSemd_t *logicalSemd = searchLogicalSemd(semAddr);
+
+  /* 5. If no matching node is found */
+  if (logicalSemd == NULL) {
+    SYSCALL(VERHOGEN, (int)&ALSL_Semaphore, 0, 0);
+    switchContext(excState);
+  } else {
+    /* 6. Matching node found: Deallocate it and V the private semaphore */
+    support_t *blockedSup = logicalSemd->ls_supStruct;
+    removeLogicalSemd(logicalSemd);
+    freeLogicalSemd(logicalSemd);
+
+    /* Wake up the blocked process */
+    SYSCALL(VERHOGEN, (int)&blockedSup->sup_privateSem, 0, 0);
+
+    /* 7. Release mutual exclusion over the ALSL */
+    SYSCALL(VERHOGEN, (int)&ALSL_Semaphore, 0, 0);
+
+    /* 8. Return control to the calling U-proc */
+    switchContext(excState);
+  }
 }
 
 void initALSL() {
@@ -179,5 +218,48 @@ HIDDEN void insertLogicalSemd(logicalSemd_t *semd) {
 }
 
 HIDDEN void removeLogicalSemd(logicalSemd_t *semd) {
-  /* TODO: fill in the implementation */
+  if (emptyLogicalSemdList()) {
+    return;
+  }
+
+  logicalSemd_t *prevNode = semd->ls_prev;
+  logicalSemd_t *nextNode = semd->ls_next;
+
+  if (prevNode == semd && nextNode == semd) {
+    /* Remove the only node in the list */
+    blockedUprocs = NULL;
+  } else {
+    /* Remove from a list with 2+ nodes */
+    prevNode->ls_next = nextNode;
+    nextNode->ls_prev = prevNode;
+
+    if (semd == blockedUprocs) {
+      /* If remove the tail node, update tail pointer */
+      blockedUprocs = prevNode;
+    }
+  }
+}
+
+
+/**
+ * Searches the ALSL for the first (oldest) node matching the semaphore address
+ */
+HIDDEN logicalSemd_t *searchLogicalSemd(int *semAddr) {
+  if (emptyLogicalSemdList()) {
+    return NULL;
+  }
+  
+  logicalSemd_t *current = headLogicalSemdList();
+  logicalSemd_t *found = NULL;
+
+  /* Iterate through the circular list and stop as soon as there's a match */
+  do {
+    if (current->ls_semAddr == semAddr) {
+      found = current;
+      break;
+    }
+    current = current->ls_next;
+  } while (current != headLogicalSemdList());
+
+  return found;
 }
