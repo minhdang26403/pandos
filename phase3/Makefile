@@ -21,11 +21,17 @@ SUPDIR = $(UMPS3_DIR_PREFIX)/share/umps3
 DEFS = ../h/const.h ../h/types.h ../h/pcb.h ../h/asl.h \
 	../h/initial.h ../h/interrupts.h ../h/scheduler.h ../h/exceptions.h \
 	../h/initProc.h ../h/vmSupport.h ../h/sysSupport.h ../h/supportAlloc.h \
+	../h/deviceSupportDMA.h ../h/deviceSupportChar.h \
+	../h/delayDaemon.h \
+	../h/alsl.h \
 	$(INCDIR)/libumps.h Makefile
 
 OBJS = asl.o pcb.o \
        initial.o interrupts.o scheduler.o exceptions.o \
-       initProc.o vmSupport.o sysSupport.o supportAlloc.o
+       initProc.o vmSupport.o sysSupport.o supportAlloc.o \
+			 deviceSupportDMA.o deviceSupportChar.o \
+			 delayDaemon.o \
+			 alsl.o \
 
 CFLAGS = -ffreestanding -ansi -Wall -c -mips1 -mabi=32 -mfp32 -mno-gpopt -G 0 -fno-pic -mno-abicalls
 
@@ -68,6 +74,18 @@ scheduler.o: ../phase2/scheduler.c $(DEFS)
 	$(CC) $(CFLAGS) $<
 
 exceptions.o: ../phase2/exceptions.c $(DEFS)
+	$(CC) $(CFLAGS) $<
+
+deviceSupportDMA.o: ../phase4/deviceSupportDMA.c $(DEFS)
+	$(CC) $(CFLAGS) $<
+
+deviceSupportChar.o: ../phase4/deviceSupportChar.c $(DEFS)
+	$(CC) $(CFLAGS) $<
+
+delayDaemon.o: ../phase5/delayDaemon.c $(DEFS)
+	$(CC) $(CFLAGS) $<
+
+alsl.o: ../phase6/alsl.c $(DEFS)
 	$(CC) $(CFLAGS) $<
 
 clean:
