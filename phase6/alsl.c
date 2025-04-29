@@ -41,9 +41,9 @@ HIDDEN void freeLogicalSemd(logicalSemd_t *semd);
 HIDDEN int emptyLogicalSemdList();
 HIDDEN logicalSemd_t *headLogicalSemdList();
 
+HIDDEN logicalSemd_t *searchLogicalSemd(int *semAddr);
 HIDDEN void insertLogicalSemd(logicalSemd_t *semd);
 HIDDEN void removeLogicalSemd(logicalSemd_t *semd);
-HIDDEN logicalSemd_t *searchLogicalSemd(int *semAddr);
 
 /*====================Global function definitions====================*/
 /**
@@ -110,7 +110,8 @@ void sysVerhogenLogicalSem(state_t *excState, support_t *sup) {
     programTrapHandler(sup);
   }
 
-  /* 2. Increment the semaphore and return control to the U-proc if the semaphore value is > 0 */
+  /* 2. Increment the semaphore and return control to the U-proc if the
+   * semaphore value is > 0 */
   (*semAddr)++;
   if (*semAddr > 0) {
     switchContext(excState);
@@ -222,24 +223,23 @@ HIDDEN void removeLogicalSemd(logicalSemd_t *semd) {
     return;
   }
 
-  logicalSemd_t *prevNode = semd->ls_prev;
-  logicalSemd_t *nextNode = semd->ls_next;
+  logicalSemd_t *prev = semd->ls_prev;
+  logicalSemd_t *next = semd->ls_next;
 
-  if (prevNode == semd && nextNode == semd) {
+  if (prev == semd && next == semd) {
     /* Remove the only node in the list */
     blockedUprocs = NULL;
   } else {
-    /* Remove from a list with 2+ nodes */
-    prevNode->ls_next = nextNode;
-    nextNode->ls_prev = prevNode;
+    /* Remove from a list with at least two nodes */
+    prev->ls_next = next;
+    next->ls_prev = prev;
 
     if (semd == blockedUprocs) {
       /* If remove the tail node, update tail pointer */
-      blockedUprocs = prevNode;
+      blockedUprocs = prev;
     }
   }
 }
-
 
 /**
  * Searches the ALSL for the first (oldest) node matching the semaphore address
@@ -248,18 +248,17 @@ HIDDEN logicalSemd_t *searchLogicalSemd(int *semAddr) {
   if (emptyLogicalSemdList()) {
     return NULL;
   }
-  
-  logicalSemd_t *current = headLogicalSemdList();
+
+  logicalSemd_t *cur = headLogicalSemdList();
   logicalSemd_t *found = NULL;
 
-  /* Iterate through the circular list and stop as soon as there's a match */
+  /* Iterate through the circular list and stop if there's a match */
   do {
-    if (current->ls_semAddr == semAddr) {
-      found = current;
-      break;
+    if (cur->ls_semAddr == semAddr) {
+      found = cur;
     }
-    current = current->ls_next;
-  } while (current != headLogicalSemdList());
+    cur = cur->ls_next;
+  } while (found == NULL && cur != headLogicalSemdList());
 
   return found;
 }
