@@ -89,8 +89,6 @@ HIDDEN void sysGetTOD(state_t *excState) {
   switchContext(excState);
 }
 
-extern void debug(int, int, int, int);
-
 /**
  * @brief Dispatch SYSCALL exceptions (syscalls 9–13 and I/O) for U-procs.
  *
@@ -137,7 +135,6 @@ HIDDEN void syscallHandler(support_t *sup) {
         sysDelay(excState, sup);
       case PSEMLOGICAL:
         sysPasserenLogicalSem(excState, sup);
-        debug(0, 0, 0, 0);
       case VSEMLOGICAL:
         sysVerhogenLogicalSem(excState, sup);
       default:

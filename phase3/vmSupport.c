@@ -266,12 +266,15 @@ void uTLB_ExceptionHandler() {
   /* 10. Update Swap Pool table */
   int asid;
   pte_t *pte;
+  unsigned int entryLO;
   if (IS_SHARED_VPN(vpn)) {
     asid = 0;
     pte = &globalPgTbl[pageIdx];
+    entryLO = (frameAddr & PFN_MASK) | PTE_DIRTY | PTE_VALID | PTE_GLOBAL;
   } else {
     asid = sup->sup_asid;
     pte = &sup->sup_privatePgTbl[pageIdx];
+    entryLO = (frameAddr & PFN_MASK) | PTE_DIRTY | PTE_VALID;
   }
 
   swapPoolTable[frameIdx].spte_asid = asid;
@@ -281,7 +284,7 @@ void uTLB_ExceptionHandler() {
   /* 11. Update Page Table (PFN and V=1) */
   unsigned int status = getSTATUS();
   setSTATUS(status & ~STATUS_IEC); /* Disable interrupts */
-  pte->pte_entryLO = (frameAddr & PFN_MASK) | PTE_DIRTY | PTE_VALID;
+  pte->pte_entryLO = entryLO;
 
   /* 12. Update TLB (atomic with 11) */
   setENTRYHI(pte->pte_entryHI);
