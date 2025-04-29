@@ -125,18 +125,25 @@ HIDDEN void syscallHandler(support_t *sup) {
         break;
       case DISKWRITE:
         sysDiskWrite(excState, sup);
+        break;
       case DISKREAD:
         sysDiskRead(excState, sup);
+        break;
       case FLASHWRITE:
         sysFlashWrite(excState, sup);
+        break;
       case FLASHREAD:
         sysFlashRead(excState, sup);
+        break;
       case DELAY:
         sysDelay(excState, sup);
+        break;
       case PSEMLOGICAL:
         sysPasserenLogicalSem(excState, sup);
+        break;
       case VSEMLOGICAL:
         sysVerhogenLogicalSem(excState, sup);
+        break;
       default:
         break;
     }
