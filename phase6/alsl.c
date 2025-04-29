@@ -80,7 +80,7 @@ void sysPasserenLogicalSem(state_t *excState, support_t *sup) {
   logicalSemd_t *logicalSemd = allocLogicalSemd();
   if (logicalSemd == NULL) {
     /* Run out of semaphore descriptors */
-    SYSCALL(VERHOGEN, (unsigned int)&ALSL_Semaphore, 0, 0);
+    SYSCALL(VERHOGEN, (int)&ALSL_Semaphore, 0, 0);
     programTrapHandler(sup);
   }
   /* Populate semaphore descriptor node and enqueue it to the ALSL */
@@ -92,8 +92,8 @@ void sysPasserenLogicalSem(state_t *excState, support_t *sup) {
    * semaphore atomically */
   unsigned int status = getSTATUS();
   setSTATUS(status & ~STATUS_IEC); /* Disable interrupts */
-  SYSCALL(VERHOGEN, (unsigned int)&ALSL_Semaphore, 0, 0);
-  SYSCALL(PASSEREN, (unsigned int)&sup->sup_privateSem, 0, 0);
+  SYSCALL(VERHOGEN, (int)&ALSL_Semaphore, 0, 0);
+  SYSCALL(PASSEREN, (int)&sup->sup_privateSem, 0, 0);
   setSTATUS(status); /* Reenable interrupts */
 
   /* 6. Return control to the U-proc */
@@ -142,11 +142,11 @@ void sysVerhogenLogicalSem(state_t *excState, support_t *sup) {
     removeLogicalSemd(logicalSemd);
     freeLogicalSemd(logicalSemd);
 
-    /* Wake up the blocked process */
-    SYSCALL(VERHOGEN, (int)&blockedSup->sup_privateSem, 0, 0);
-
     /* 7. Release mutual exclusion over the ALSL */
     SYSCALL(VERHOGEN, (int)&ALSL_Semaphore, 0, 0);
+
+    /* Wake up the blocked process */
+    SYSCALL(VERHOGEN, (int)&blockedSup->sup_privateSem, 0, 0);
 
     /* 8. Return control to the calling U-proc */
     switchContext(excState);
