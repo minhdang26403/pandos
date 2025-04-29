@@ -89,6 +89,8 @@ HIDDEN void sysGetTOD(state_t *excState) {
   switchContext(excState);
 }
 
+extern void debug(int, int, int, int);
+
 /**
  * @brief Dispatch SYSCALL exceptions (syscalls 9–13 and I/O) for U-procs.
  *
@@ -104,7 +106,7 @@ HIDDEN void syscallHandler(support_t *sup) {
   state_t *excState = &sup->sup_exceptState[GENERALEXCEPT];
   int syscallNum = excState->s_a0;
 
-  if (syscallNum >= TERMINATE && syscallNum <= DELAY) {
+  if (syscallNum >= TERMINATE && syscallNum <= VSEMLOGICAL) {
     excState->s_pc += WORDLEN; /* control of the current process should be
                                   returned to the next instruction */
     switch (syscallNum) {
@@ -135,6 +137,7 @@ HIDDEN void syscallHandler(support_t *sup) {
         sysDelay(excState, sup);
       case PSEMLOGICAL:
         sysPasserenLogicalSem(excState, sup);
+        debug(0, 0, 0, 0);
       case VSEMLOGICAL:
         sysVerhogenLogicalSem(excState, sup);
       default:
