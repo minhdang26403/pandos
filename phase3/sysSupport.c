@@ -14,6 +14,7 @@
 
 #include "../h/sysSupport.h"
 
+#include "../h/alsl.h"
 #include "../h/const.h"
 #include "../h/delayDaemon.h"
 #include "../h/deviceSupportChar.h"
@@ -103,7 +104,7 @@ HIDDEN void syscallHandler(support_t *sup) {
   state_t *excState = &sup->sup_exceptState[GENERALEXCEPT];
   int syscallNum = excState->s_a0;
 
-  if (syscallNum >= TERMINATE && syscallNum <= DELAY) {
+  if (syscallNum >= TERMINATE && syscallNum <= VSEMLOGICAL) {
     excState->s_pc += WORDLEN; /* control of the current process should be
                                   returned to the next instruction */
     switch (syscallNum) {
@@ -124,14 +125,25 @@ HIDDEN void syscallHandler(support_t *sup) {
         break;
       case DISKWRITE:
         sysDiskWrite(excState, sup);
+        break;
       case DISKREAD:
         sysDiskRead(excState, sup);
+        break;
       case FLASHWRITE:
         sysFlashWrite(excState, sup);
+        break;
       case FLASHREAD:
         sysFlashRead(excState, sup);
+        break;
       case DELAY:
         sysDelay(excState, sup);
+        break;
+      case PSEMLOGICAL:
+        sysPasserenLogicalSem(excState, sup);
+        break;
+      case VSEMLOGICAL:
+        sysVerhogenLogicalSem(excState, sup);
+        break;
       default:
         break;
     }

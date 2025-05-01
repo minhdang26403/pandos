@@ -17,6 +17,7 @@
 void initSwapStructs();
 void releaseFrames(int asid);
 int isValidAddr(memaddr addr);
+void uTLB_RefillHandler();
 void uTLB_ExceptionHandler();
 
 #endif

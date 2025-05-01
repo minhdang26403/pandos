@@ -27,8 +27,9 @@
 /* Test function of phase 2 */
 extern void test();
 
-/* Init function of phase 3 */
+/* Functions from phase 3 */
 extern void init();
+extern void uTLB_RefillHandler();
 
 /* 1. Define Nucleus's global variables */
 int procCnt;      /* The number of started, but not yet terminated processes */

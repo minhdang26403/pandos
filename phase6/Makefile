@@ -31,7 +31,7 @@ OBJS = asl.o pcb.o \
        initProc.o vmSupport.o sysSupport.o supportAlloc.o \
 			 deviceSupportDMA.o deviceSupportChar.o \
 			 delayDaemon.o \
-			 alsl.o
+			 alsl.o \
 
 CFLAGS = -ffreestanding -ansi -Wall -c -mips1 -mabi=32 -mfp32 -mno-gpopt -G 0 -fno-pic -mno-abicalls
 
@@ -94,7 +94,7 @@ deviceSupportDMA.o: ../phase4/deviceSupportDMA.c $(DEFS)
 deviceSupportChar.o: ../phase4/deviceSupportChar.c $(DEFS)
 	$(CC) $(CFLAGS) $<
 
-alsl.o: ../phase6/alsl.c $(DEFS)
+delayDaemon.o: ../phase5/delayDaemon.c $(DEFS)
 	$(CC) $(CFLAGS) $<
 
 clean:

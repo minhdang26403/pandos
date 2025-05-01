@@ -158,11 +158,12 @@
 #define DEVREG          0x10000054 /* All 40 device registers are located in low memory starting at 0x1000.0054 */
 
 /* Constants for VM management */
-#define MAXPAGES        32                          /* 32 pages per U-proc */
-#define STACKPAGE      (MAXPAGES - 1)               /* Page 31 for stack */
-#define MAX_UPROCS      8                           /* Maximum number of concurrent user processes */
-#define UPROC_PC        0x800000B0                  /* .text start */
-#define UPROC_SP        0xC0000000                  /* RAM top */
+#define MAXPAGES            32                /* 32 pages per U-proc */
+#define STACKPAGE           (MAXPAGES - 1)    /* Page 31 for stack */
+#define KUSEGSHARE_PAGES    32                /* Number of pages in shared logical address space */
+#define MAX_UPROCS          8                 /* Maximum number of concurrent user processes */
+#define UPROC_PC            0x800000B0        /* .text start */
+#define UPROC_SP            0xC0000000        /* RAM top */
 
 #define DISK_DMA_BASE   (RAMSTART + 32 * PAGESIZE)      /* Starting physical address of DMA buffers for disk device */
 #define FLASH_DMA_BASE  (DISK_DMA_BASE + 8 * PAGESIZE)  /* Starting physical address of DMA buffers for flash device */
@@ -177,8 +178,15 @@
 #define VPN_MASK        0xFFFFF000                  /* Mask for VPN (bits 31-12) */
 #define PFN_MASK        0xFFFFF000                  /* Mask for PFN (bits 31-12) */
 
-#define VPN_TEXT_BASE   0x80000                     /* Base VPN for .text/.data */
-#define VPN_STACK       0xBFFFF                     /* VPN for stack page */
+#define VPN_TEXT_BASE           0x80000     /* Base VPN for .text/.data */
+#define VPN_STACK               0xBFFFF     /* VPN for stack page */
+#define VPN_KUSEGSHARE_BASE     0xC0000     /* Base VPN for shared KUSEG */
+
+#define KUSEGSHARE_BASE         (VPN_KUSEGSHARE_BASE << VPN_SHIFT)
+
+#define IS_SHARED_VPN(vpn)      ((vpn) >= VPN_KUSEGSHARE_BASE)
+
+#define KUSEG_BASE_SECTOR       (MAX_UPROCS * MAXPAGES)   /* Base sector (backing store) of shared pages */
 
 /* constant for .aout file format */
 #define TEXT_FILE_SIZE_OFFSET   0x0014
@@ -193,6 +201,7 @@ For a 32-bit EntryLo, the format is:
   - bit 8: G (Global bit)
   - bits 7-0 (lowest 8 bits): Unused
 */
+#define PTE_GLOBAL      (1U << 8)
 #define PTE_VALID       (1U << 9)
 #define PTE_DIRTY       (1U << 10)
 
@@ -240,6 +249,8 @@ For a 32-bit EntryLo, the format is:
 #define FLASHWRITE        16    /* Write to Flash */
 #define FLASHREAD         17    /* Read from Flash */
 #define DELAY             18    /* Delay the calling U-proc for some number of seconds */
+#define PSEMLOGICAL       19    /* P a logical (in kuseg_share) semaphore */
+#define VSEMLOGICAL       20    /* V a logical (in kuseg_share) semaphore */
 
 /* Device-specific constants */
 #define PRINTER_MAXLEN    128    /* Max length for SYS11 */

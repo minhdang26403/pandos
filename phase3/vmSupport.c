@@ -87,6 +87,18 @@ void releaseFrames(int asid) {
 int isValidAddr(memaddr addr) { return addr >= KUSEG; }
 
 /**
+ * @brief Translate the virtual page number (vpn) to the page table entry's
+ * index. The way this function translates depends on whether the vpn is a
+ * shared or private vpn.
+ *
+ * @param vpn the virtual page number to translate
+ * @return the page table entry's index
+ */
+HIDDEN int vpnToPageIndex(unsigned int vpn) {
+  return IS_SHARED_VPN(vpn) ? (vpn - VPN_KUSEGSHARE_BASE) : (vpn % MAXPAGES);
+}
+
+/**
  * @brief Select a frame from the swap pool to load a virtual page.
  *
  * First attempts to find an unoccupied frame. If none are free, applies a FIFO
@@ -120,6 +132,46 @@ HIDDEN int chooseFrame() {
 }
 
 /**
+ * @brief Handle TLB refill exception (Phase 2 version).
+ *
+ * Extracts the VPN from the exception state, finds the corresponding PTE in the
+ * process's private page table, and writes it into the TLB. If the process
+ * lacks a support structure, it is terminated. Execution resumes from the
+ * faulting instruction.
+ *
+ * @return This function does not return; control is transferred via
+ * switchContext or termination.
+ */
+void uTLB_RefillHandler() {
+  /* Get saved exception state from BIOS Data Page */
+  state_t *savedExcState = (state_t *)BIOSDATAPAGE;
+
+  /* Extract VPN: mask then shift */
+  unsigned int entryHI = savedExcState->s_entryHI;
+  unsigned int vpn = (entryHI & VPN_MASK) >> VPN_SHIFT;
+
+  /* Get Page Table entry */
+  support_t *sup = currentProc->p_supportStruct;
+  if (sup == NULL) {
+    /* Consistent with Phase 2 behavior (pass up or die) */
+    sysTerminateProc(savedExcState);
+  }
+
+  /* Select correct page table entry (private or shared) */
+  int pageIdx = vpnToPageIndex(vpn);
+  pte_t *pte = IS_SHARED_VPN(vpn) ? &globalPgTbl[pageIdx]
+                                  : &sup->sup_privatePgTbl[pageIdx];
+
+  /* Write to TLB */
+  setENTRYHI(pte->pte_entryHI);
+  setENTRYLO(pte->pte_entryLO);
+  TLBWR();
+
+  /* Return control to the process to retry the instruction */
+  switchContext(savedExcState);
+}
+
+/**
  * @brief TLB exception handler (Pager) for the Support Level. The handler
  * ensures TLB and page table updates are atomic and correctly ordered to
  * prevent data races, stale access, or inconsistency across interrupts.
@@ -142,7 +194,16 @@ void uTLB_ExceptionHandler() {
 
   /* 5. Get missing page number (p) from EntryHi */
   unsigned int vpn = (savedExcState->s_entryHI & VPN_MASK) >> VPN_SHIFT;
-  int pageIdx = vpn % MAXPAGES;
+  /* Compute page index within either the private or shared page table */
+  int pageIdx = vpnToPageIndex(vpn);
+
+  /* Another U-proc may have already loaded the shared page. If the global page
+   * table entry is now valid, there's no need to reload it.
+   */
+  if (IS_SHARED_VPN(vpn) && (globalPgTbl[pageIdx].pte_entryLO & PTE_VALID)) {
+    SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
+    switchContext(savedExcState);
+  }
 
   /* 6. Pick a frame (i) */
   int frameIdx = chooseFrame();
@@ -181,8 +242,10 @@ void uTLB_ExceptionHandler() {
 
     /* 8.(c). Write to old process's backing store */
     memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
-    int oldPageIdx = oldVpn % MAXPAGES;
-    int sectorNum = (oldAsid - 1) * MAXPAGES + oldPageIdx;
+    int oldPageIdx = vpnToPageIndex(oldVpn);
+    int sectorNum = IS_SHARED_VPN(oldVpn)
+                        ? KUSEG_BASE_SECTOR + oldPageIdx
+                        : (oldAsid - 1) * MAXPAGES + oldPageIdx;
 
     if (diskOperation(BACKING_DISK, sectorNum, frameAddr, DISK_WRITEBLK) < 0) {
       SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
@@ -192,7 +255,8 @@ void uTLB_ExceptionHandler() {
 
   /* 9. Read current process's page p into frame i */
   memaddr frameAddr = swapPool + (frameIdx * PAGESIZE);
-  int sectorNum = (sup->sup_asid - 1) * MAXPAGES + pageIdx;
+  int sectorNum = IS_SHARED_VPN(vpn) ? KUSEG_BASE_SECTOR + pageIdx
+                                     : (sup->sup_asid - 1) * MAXPAGES + pageIdx;
 
   if (diskOperation(BACKING_DISK, sectorNum, frameAddr, DISK_READBLK) < 0) {
     SYSCALL(VERHOGEN, (int)&swapPoolSem, 0, 0);
@@ -200,15 +264,27 @@ void uTLB_ExceptionHandler() {
   }
 
   /* 10. Update Swap Pool table */
-  swapPoolTable[frameIdx].spte_asid = sup->sup_asid;
+  int asid;
+  pte_t *pte;
+  unsigned int entryLO;
+  if (IS_SHARED_VPN(vpn)) {
+    asid = 0;
+    pte = &globalPgTbl[pageIdx];
+    entryLO = (frameAddr & PFN_MASK) | PTE_DIRTY | PTE_VALID | PTE_GLOBAL;
+  } else {
+    asid = sup->sup_asid;
+    pte = &sup->sup_privatePgTbl[pageIdx];
+    entryLO = (frameAddr & PFN_MASK) | PTE_DIRTY | PTE_VALID;
+  }
+
+  swapPoolTable[frameIdx].spte_asid = asid;
   swapPoolTable[frameIdx].spte_vpn = vpn;
-  swapPoolTable[frameIdx].spte_pte = &sup->sup_privatePgTbl[pageIdx];
+  swapPoolTable[frameIdx].spte_pte = pte;
 
   /* 11. Update Page Table (PFN and V=1) */
-  pte_t *pte = &sup->sup_privatePgTbl[pageIdx];
   unsigned int status = getSTATUS();
   setSTATUS(status & ~STATUS_IEC); /* Disable interrupts */
-  pte->pte_entryLO = (frameAddr & PFN_MASK) | PTE_DIRTY | PTE_VALID;
+  pte->pte_entryLO = entryLO;
 
   /* 12. Update TLB (atomic with 11) */
   setENTRYHI(pte->pte_entryHI);
